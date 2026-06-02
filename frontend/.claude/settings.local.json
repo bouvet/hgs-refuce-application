@@ -1,0 +1,15 @@
+{
+  "env": {
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-6",
+    "ANTHROPIC_OPUS_MODEL": "claude-opus-4-6"
+  },
+  "enabledMcpjsonServers": [],
+  "disabledMcpjsonServers": [
+    "shadcn"
+  ],
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:toolboxjs.com)"
+    ]
+  }
+}

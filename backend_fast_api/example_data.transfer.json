@@ -1,0 +1,114 @@
+{
+    "January": {
+        "monday": {
+            "Rest": 1.1,
+            "Mat" : 2.2,
+            "Plast": 3.3,
+            "Papp": 4.4
+        },
+
+        "thuesday": {
+            "Rest": 1.1,
+            "Mat" : 2.2,
+            "Plast": 3.3,
+            "Papp": 4.4
+        },
+
+        "wednesday": {
+            "Rest": 1.1,
+            "Mat" : 2.2,
+            "Plast": 3.3,
+            "Papp": 4.4
+        },
+
+        "thursday": {
+            "Rest": 1.1,
+            "Mat" : 2.2,
+            "Plast": 3.3,
+            "Papp": 4.4
+        },
+
+        "friday": {
+            "Rest": 1.1,
+            "Mat" : 2.2,
+            "Plast": 3.3,
+            "Papp": 4.4
+        }
+    },
+
+    "February": {
+
+        "monday": {
+            "Rest": 5.5,
+            "Mat" : 6.6,
+            "Plast": 7.7,
+            "Papp": 8.8
+        },
+
+        "thuesday": {
+            "Rest": 5.5,
+            "Mat" : 6.6,
+            "Plast": 7.7,
+            "Papp": 8.8
+        },
+
+        "wednesday": {
+            "Rest": 5.5,
+            "Mat" : 6.6,
+            "Plast": 7.7,
+            "Papp": 8.8
+        },
+
+        "thursday": {
+            "Rest": 5.5,
+            "Mat" : 6.6,
+            "Plast": 7.7,
+            "Papp": 8.8
+        },
+
+        "friday": {
+            "Rest": 5.5,
+            "Mat" : 6.6,
+            "Plast": 7.7,
+            "Papp": 8.8
+        }
+    },
+
+    "March": {
+        "monday": {
+            "Rest": 9.9,
+            "Mat" : 10.1,
+            "Plast": 11.11,
+            "Papp": 12.12
+        },
+
+         "thuesday": {
+            "Rest": 9.9,
+            "Mat" : 10.1,
+            "Plast": 11.11,
+            "Papp": 12.12
+        },
+
+         "wednesday": {
+            "Rest": 9.9,
+            "Mat" : 10.1,
+            "Plast": 11.11,
+            "Papp": 12.12
+        },
+
+         "thursday": {
+            "Rest": 9.9,
+            "Mat" : 10.1,
+            "Plast": 11.11,
+            "Papp": 12.12
+        },
+
+         "friday": {
+            "Rest": 9.9,
+            "Mat" : 10.1,
+            "Plast": 11.11,
+            "Papp": 12.12
+        }
+    }
+
+}

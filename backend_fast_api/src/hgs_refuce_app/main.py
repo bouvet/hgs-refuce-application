@@ -1,22 +1,482 @@
-from fastapi import FastAPI, HTTPException
-from .models import DataPoint, DataPointInDB
-from .storage import Storage
+import logging
+import os
+import time
+from contextlib import asynccontextmanager
+from typing import List, Optional
 
-app = FastAPI(title="hgs-refuce-application")
-storage = Storage("data.db")
+from fastapi import FastAPI, HTTPException, Query, Request, Response, Header, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
-@app.post("/add_datapoint", response_model=DataPointInDB)
-def add_datapoint(dp: DataPoint):
-    saved = storage.add_datapoint(dp)
-    return saved
+from .logging_config import flush_logs, setup_logging
+from .models import (
+    Report,
+    SubmitReportRequest,
+    WasteRegistration,
+    Location,
+    User,
+    CreateUserRequest,
+    CreateLocationRequest,
+    LocationUserEntry,
+    LoginRequest,
+)
+from .storage import UserStorage, DataStorage, date_to_quarter
 
-@app.get("/get_datapoint/{id}", response_model=DataPointInDB)
-def get_datapoint(id: int):
-    dp = storage.get_datapoint(id)
-    if not dp:
-        raise HTTPException(status_code=404, detail="Not found")
-    return dp
+setup_logging()
+logger = logging.getLogger(__name__)
 
-@app.get("/get_datapoints")
-def get_datapoints():
-    return storage.list_datapoints()
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    logger.info("application starting")
+    # Initialize with demo data if empty
+    if not user_storage.list_locations():
+        logger.info("initializing with demo data")
+        bouvet_id = user_storage.create_location("Bouvet Office")
+        user_storage.create_user("common", is_admin=False, password="common")
+        user_storage.create_user("admin", is_admin=True, password="admin")
+        user_storage.add_user_to_location(bouvet_id, "common")
+        user_storage.add_user_to_location(bouvet_id, "admin")
+    # Create super-admin user if it doesn't exist
+    if not user_storage.user_exists("sadmin"):
+        logger.info("creating super-admin user")
+        user_storage.create_user("sadmin", is_admin=True, password="sadmin", is_super_admin=True)
+    # Ensure Haugesund demo data
+    haugesund = user_storage.get_location_by_name("Haugesund")
+    if not haugesund:
+        haugesund_id = user_storage.create_location("Haugesund")
+    else:
+        haugesund_id = haugesund.id
+    if not user_storage.user_exists("haugesundUser"):
+        user_storage.create_user("haugesundUser", is_admin=False, password="123")
+    if not user_storage.location_has_access(haugesund_id, "haugesundUser"):
+        user_storage.add_user_to_location(haugesund_id, "haugesundUser")
+    # Ensure Stavanger demo data
+    stavanger = user_storage.get_location_by_name("Stavanger")
+    if not stavanger:
+        stavanger_id = user_storage.create_location("Stavanger")
+    else:
+        stavanger_id = stavanger.id
+    if not user_storage.user_exists("stavangerUser"):
+        user_storage.create_user("stavangerUser", is_admin=False, password="123")
+    if not user_storage.location_has_access(stavanger_id, "stavangerUser"):
+        user_storage.add_user_to_location(stavanger_id, "stavangerUser")
+    try:
+        yield
+    finally:
+        logger.info("application shutting down")
+        flush_logs("shutdown")
+
+
+app = FastAPI(title="hgs-refuce-application", lifespan=lifespan)
+_data_db_path = os.environ.get("DATA_DB_PATH", "data.db")
+_users_db_path = os.environ.get("USERS_DB_PATH", "users.db")
+user_storage = UserStorage(_users_db_path)
+data_storage = DataStorage(_data_db_path)
+
+_origins = [
+    o.strip()
+    for o in os.environ.get("BACKEND_CORS_ORIGINS", "http://localhost:3000").split(",")
+    if o.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = (time.perf_counter() - start) * 1000
+    logger.info(
+        "%s %s -> %d (%.1fms)",
+        request.method,
+        request.url.path,
+        response.status_code,
+        duration_ms,
+    )
+    return response
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    # ERROR triggers a prod log-buffer flush so the crash context lands on disk.
+    logger.exception(
+        "unhandled exception during %s %s", request.method, request.url.path
+    )
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+
+# ---------- dependencies ----------
+
+def _now_iso() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
+
+
+def get_user_id(x_user_id: Optional[str] = Header(None)) -> str:
+    if not x_user_id:
+        raise HTTPException(status_code=401, detail="X-User-Id header required")
+    return x_user_id
+
+
+def get_admin_secret(x_admin_secret: Optional[str] = Header(None)) -> str:
+    expected = os.environ.get("ADMIN_SECRET")
+    if not expected:
+        raise HTTPException(status_code=500, detail="ADMIN_SECRET not configured")
+    if x_admin_secret != expected:
+        raise HTTPException(status_code=403, detail="Invalid admin secret")
+    return x_admin_secret
+
+
+def require_admin(user_id: str = Depends(get_user_id)) -> str:
+    user = user_storage.get_user(user_id)
+    if not user or not user.isAdmin:
+        raise HTTPException(status_code=403, detail="Admin required")
+    return user_id
+
+
+def require_super_admin(user_id: str = Depends(get_user_id)) -> str:
+    user = user_storage.get_user(user_id)
+    if not user or not user.isSuperAdmin:
+        raise HTTPException(status_code=403, detail="Super-admin required")
+    return user_id
+
+
+def require_location_access(location_id: str, user_id: str = Depends(get_user_id)) -> str:
+    user = user_storage.get_user(user_id)
+    if user and user.isSuperAdmin:
+        return user_id
+    if not user_storage.location_exists(location_id):
+        raise HTTPException(status_code=404, detail="Location not found")
+    if not user_storage.location_has_access(location_id, user_id):
+        raise HTTPException(status_code=403, detail="Access denied to this location")
+    return user_id
+
+
+# ---------- root ----------
+
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to the Refuce Application API\n\nDocumentation available at /docs"}
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return Response(status_code=204)
+
+
+# ---------- admin endpoints (developer only) ----------
+
+@app.post("/admin/locations", response_model=Location, status_code=201)
+def admin_create_location(
+    req: CreateLocationRequest,
+    _: str = Depends(get_admin_secret)
+):
+    if user_storage.location_name_exists(req.name):
+        raise HTTPException(status_code=409, detail="Location already exists")
+    from datetime import datetime, timezone
+    loc_id = user_storage.create_location(req.name)
+    return Location(id=loc_id, name=req.name, createdAt=datetime.now(timezone.utc).isoformat())
+
+
+@app.get("/admin/locations", response_model=List[Location])
+def admin_list_locations(_: str = Depends(get_admin_secret)):
+    return user_storage.list_locations()
+
+
+@app.post("/admin/users", response_model=User, status_code=201)
+def admin_create_user(
+    req: CreateUserRequest,
+    _: str = Depends(get_admin_secret)
+):
+    if user_storage.user_exists(req.id):
+        raise HTTPException(status_code=409, detail="User already exists")
+    user_storage.create_user(req.id, req.isAdmin)
+    return User(id=req.id, isAdmin=req.isAdmin)
+
+
+@app.post("/admin/locations/{location_id}/users/{user_id}", status_code=201)
+def admin_add_user_to_location(
+    location_id: str,
+    user_id: str,
+    _: str = Depends(get_admin_secret)
+):
+    if not user_storage.location_exists(location_id):
+        raise HTTPException(status_code=404, detail="Location not found")
+    if not user_storage.user_exists(user_id):
+        raise HTTPException(status_code=404, detail="User not found")
+    if user_storage.location_has_access(location_id, user_id):
+        raise HTTPException(status_code=409, detail="User already has access to location")
+    user_storage.add_user_to_location(location_id, user_id)
+    return {"detail": "User added to location"}
+
+
+# ---------- auth endpoints ----------
+
+@app.post("/auth/login", response_model=User)
+def login(req: LoginRequest):
+    if not user_storage.user_exists(req.username):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if not user_storage.check_password(req.username, req.password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    user = user_storage.get_user(req.username)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return user
+
+
+# ---------- user endpoints ----------
+
+@app.get("/locations", response_model=List[Location])
+def list_user_locations(user_id: str = Depends(get_user_id)):
+    return user_storage.get_user_locations(user_id)
+
+
+@app.post("/locations", response_model=Location, status_code=201)
+def create_location_as_super_admin(
+    req: CreateLocationRequest,
+    _: str = Depends(require_super_admin)
+):
+    if user_storage.location_name_exists(req.name):
+        raise HTTPException(status_code=409, detail="En lokasjon med dette navnet finnes allerede")
+    from datetime import datetime, timezone
+    loc_id = user_storage.create_location(req.name)
+    return Location(id=loc_id, name=req.name, createdAt=datetime.now(timezone.utc).isoformat())
+
+
+@app.delete("/locations/{location_id}", status_code=204, response_class=Response)
+def delete_location(
+    location_id: str,
+    _: str = Depends(require_super_admin)
+):
+    if not user_storage.location_exists(location_id):
+        raise HTTPException(status_code=404, detail="Location not found")
+    user_storage.delete_location(location_id)
+    data_storage.delete_registrations_for_location(location_id)
+    data_storage.delete_reports_for_location(location_id)
+    return Response(status_code=204)
+
+
+@app.get("/users", response_model=List[User])
+def list_all_users(_: str = Depends(require_super_admin)):
+    return user_storage.list_users()
+
+
+@app.post("/users", response_model=User, status_code=201)
+def create_user_as_admin(
+    req: CreateUserRequest,
+    _: str = Depends(require_admin)
+):
+    if user_storage.user_exists(req.id):
+        raise HTTPException(status_code=409, detail="User already exists")
+    user_storage.create_user(req.id, req.isAdmin)
+    return User(id=req.id, isAdmin=req.isAdmin, isSuperAdmin=False)
+
+
+@app.delete("/users/{user_id}", status_code=204, response_class=Response)
+def delete_user_endpoint(
+    user_id: str,
+    _: str = Depends(require_super_admin)
+):
+    if user_id == "sadmin":
+        raise HTTPException(status_code=403, detail="Cannot delete super-admin user")
+    if not user_storage.user_exists(user_id):
+        raise HTTPException(status_code=404, detail="User not found")
+    user_storage.delete_user(user_id)
+    return Response(status_code=204)
+
+
+@app.get("/locations/{location_id}/users", response_model=List[str])
+def list_location_users(
+    location_id: str,
+    _: str = Depends(require_admin)
+):
+    if not user_storage.location_exists(location_id):
+        raise HTTPException(status_code=404, detail="Location not found")
+    return user_storage.list_users_in_location(location_id)
+
+
+@app.post("/locations/{location_id}/users/{user_id}", status_code=201)
+def add_user_to_location_as_admin(
+    location_id: str,
+    user_id: str,
+    admin_id: str = Depends(require_admin)
+):
+    if not user_storage.location_exists(location_id):
+        raise HTTPException(status_code=404, detail="Location not found")
+    if not user_storage.user_exists(user_id):
+        raise HTTPException(status_code=404, detail="User not found")
+    if user_storage.location_has_access(location_id, user_id):
+        raise HTTPException(status_code=409, detail="User already has access")
+    user_storage.add_user_to_location(location_id, user_id)
+    return {"detail": "User added to location"}
+
+
+@app.delete("/locations/{location_id}/users/{user_id}", status_code=204, response_class=Response)
+def remove_user_from_location_as_admin(
+    location_id: str,
+    user_id: str,
+    _: str = Depends(require_admin)
+):
+    if not user_storage.location_exists(location_id):
+        raise HTTPException(status_code=404, detail="Location not found")
+    if not user_storage.remove_user_from_location(location_id, user_id):
+        raise HTTPException(status_code=404, detail="User not in location")
+    return Response(status_code=204)
+
+
+# ---------- registrations ----------
+
+@app.get("/locations/{location_id}/registrations", response_model=List[WasteRegistration])
+def list_registrations(
+    location_id: str,
+    date: Optional[str] = Query(None, description="YYYY-MM-DD exact match"),
+    period: Optional[str] = Query(None, description="YYYY-Qn quarter"),
+    date_from: Optional[str] = Query(None, alias="from"),
+    date_to: Optional[str] = Query(None, alias="to"),
+    _: str = Depends(require_location_access)
+):
+    if date is not None:
+        reg = data_storage.get_registration_by_date(location_id, date)
+        return [reg] if reg else []
+    if period is not None:
+        year, q = period.split("-Q")
+        q_int = int(q)
+        start_month = (q_int - 1) * 3 + 1
+        end_month = start_month + 2
+        start = f"{year}-{start_month:02d}-01"
+        last_day = 31 if end_month in (3, 12) else (30 if end_month in (6, 9) else 31)
+        end = f"{year}-{end_month:02d}-{last_day:02d}"
+        return data_storage.list_registrations(location_id, date_from=start, date_to=end)
+    return data_storage.list_registrations(location_id, date_from=date_from, date_to=date_to)
+
+
+@app.post("/locations/{location_id}/registrations", response_model=WasteRegistration, status_code=201)
+def create_registration(
+    location_id: str,
+    reg: WasteRegistration,
+    _: str = Depends(require_location_access)
+):
+    if data_storage.is_date_locked(location_id, reg.date):
+        logger.warning("rejected registration %s: quarter %s is locked", reg.id, date_to_quarter(reg.date))
+        raise HTTPException(
+            status_code=409,
+            detail=f"Quarter {date_to_quarter(reg.date)} is locked",
+        )
+    if data_storage.get_registration(location_id, reg.id) is not None:
+        logger.warning("rejected registration %s: id already exists", reg.id)
+        raise HTTPException(status_code=409, detail="Registration id already exists")
+    data_storage.insert_registration(location_id, reg)
+    logger.info("created registration %s for %s by %s", reg.id, reg.date, reg.createdBy)
+    return reg
+
+
+@app.get("/locations/{location_id}/registrations/{id}", response_model=WasteRegistration)
+def get_registration(
+    location_id: str,
+    id: str,
+    _: str = Depends(require_location_access)
+):
+    reg = data_storage.get_registration(location_id, id)
+    if reg is None:
+        raise HTTPException(status_code=404, detail="Registration not found")
+    return reg
+
+
+@app.put("/locations/{location_id}/registrations/{id}", response_model=WasteRegistration)
+def update_registration(
+    location_id: str,
+    id: str,
+    reg: WasteRegistration,
+    _: str = Depends(require_location_access)
+):
+    if id != reg.id:
+        raise HTTPException(status_code=400, detail="Path id does not match body id")
+    existing = data_storage.get_registration(location_id, id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Registration not found")
+    if data_storage.is_date_locked(location_id, existing.date) or data_storage.is_date_locked(location_id, reg.date):
+        logger.warning("rejected update %s: quarter is locked", id)
+        raise HTTPException(status_code=409, detail="Quarter is locked")
+    data_storage.update_registration(location_id, reg)
+    logger.info("updated registration %s", id)
+    return reg
+
+
+@app.delete("/locations/{location_id}/registrations/{id}", status_code=204, response_class=Response)
+def delete_registration(
+    location_id: str,
+    id: str,
+    _: str = Depends(require_location_access)
+):
+    existing = data_storage.get_registration(location_id, id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Registration not found")
+    if data_storage.is_date_locked(location_id, existing.date):
+        logger.warning("rejected delete %s: quarter is locked", id)
+        raise HTTPException(status_code=409, detail="Quarter is locked")
+    data_storage.delete_registration(location_id, id)
+    logger.info("deleted registration %s", id)
+    return Response(status_code=204)
+
+
+# ---------- reports ----------
+
+@app.get("/locations/{location_id}/reports", response_model=List[Report])
+def list_reports(
+    location_id: str,
+    _: str = Depends(require_location_access)
+):
+    return data_storage.list_reports(location_id)
+
+
+@app.get("/locations/{location_id}/reports/{period}", response_model=Report)
+def get_report(
+    location_id: str,
+    period: str,
+    _: str = Depends(require_location_access)
+):
+    report = data_storage.get_report(location_id, period)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return report
+
+
+@app.post("/locations/{location_id}/reports", response_model=Report, status_code=201)
+def submit_report(
+    location_id: str,
+    req: SubmitReportRequest,
+    _: str = Depends(require_location_access)
+):
+    if data_storage.get_report(location_id, req.period) is not None:
+        logger.warning("rejected report submit %s: already submitted", req.period)
+        raise HTTPException(
+            status_code=409, detail=f"Report for {req.period} already submitted"
+        )
+    report = Report(
+        id=f"report-{req.period}",
+        period=req.period,
+        submittedAt=_now_iso(),
+        submittedBy=req.submittedBy,
+    )
+    data_storage.insert_report(location_id, report)
+    logger.info("submitted report %s by %s", req.period, req.submittedBy)
+    return report
+
+
+@app.delete("/locations/{location_id}/reports/{period}", status_code=204, response_class=Response)
+def unlock_report(
+    location_id: str,
+    period: str,
+    _: str = Depends(require_location_access)
+):
+    if not data_storage.delete_report(location_id, period):
+        raise HTTPException(status_code=404, detail="Report not found")
+    logger.info("unlocked report %s", period)
+    return Response(status_code=204)
