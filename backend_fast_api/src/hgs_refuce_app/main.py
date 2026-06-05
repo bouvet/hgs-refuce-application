@@ -20,7 +20,7 @@ from .models import (
     LocationUserEntry,
     LoginRequest,
 )
-from .storage import UserStorage, DataStorage, date_to_quarter
+from .storage import UserStorage, DataStorage, DatabaseConnection, date_to_quarter
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -69,10 +69,17 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="hgs-refuce-application", lifespan=lifespan)
-_data_db_path = os.environ.get("DATA_DB_PATH", "data.db")
-_users_db_path = os.environ.get("USERS_DB_PATH", "users.db")
-user_storage = UserStorage(_users_db_path)
-data_storage = DataStorage(_data_db_path)
+
+_is_production = os.environ.get("APP_ENV", "development").lower() == "production"
+_database_url = os.environ.get("DATABASE_URL")
+if _is_production and not _database_url:
+    raise ValueError("DATABASE_URL is required in production")
+if not _database_url:
+    _database_url = "sqlite:///data.db"
+logger.info("using database: %s", "PostgreSQL" if "postgresql" in _database_url else "SQLite")
+_db = DatabaseConnection(_database_url)
+user_storage = UserStorage(_db)
+data_storage = DataStorage(_db)
 
 _origins = [
     o.strip()
@@ -164,6 +171,17 @@ def require_location_access(location_id: str, user_id: str = Depends(get_user_id
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the Refuce Application API\n\nDocumentation available at /docs"}
+
+
+@app.get("/db-test")
+def db_test():
+    try:
+        with _db.engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return {"status": "ok", "message": "Database connection successful"}
+    except Exception as e:
+        logger.error("database connection failed: %s", e)
+        return {"status": "error", "message": str(e)}, 500
 
 
 @app.get("/favicon.ico", include_in_schema=False)
