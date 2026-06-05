@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 from hgs_refuce_app.main import app, user_storage, data_storage
 
 client = TestClient(app)
@@ -9,13 +10,15 @@ TEST_ADMIN = "test-admin"
 
 
 def setup_function():
-    user_storage.conn.execute("DELETE FROM location_users")
-    user_storage.conn.execute("DELETE FROM locations")
-    user_storage.conn.execute("DELETE FROM users")
-    user_storage.conn.commit()
-    data_storage.conn.execute("DELETE FROM registrations")
-    data_storage.conn.execute("DELETE FROM reports")
-    data_storage.conn.commit()
+    with user_storage.engine.connect() as conn:
+        conn.execute(text("DELETE FROM location_users"))
+        conn.execute(text("DELETE FROM locations"))
+        conn.execute(text("DELETE FROM users"))
+        conn.commit()
+    with data_storage.engine.connect() as conn:
+        conn.execute(text("DELETE FROM registrations"))
+        conn.execute(text("DELETE FROM reports"))
+        conn.commit()
 
 
 def _seed_location_and_user():
