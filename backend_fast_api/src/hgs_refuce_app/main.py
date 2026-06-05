@@ -1,8 +1,8 @@
 import logging
 import os
-from pydoc import text
 import time
 from contextlib import asynccontextmanager
+from sqlalchemy import text
 from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException, Query, Request, Response, Header, Depends
