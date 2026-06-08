@@ -23,6 +23,7 @@ class DatabaseConnection:
             database_url,
             echo=False,
             pool_pre_ping=True,
+            pool_recycle=300,
             connect_args={"check_same_thread": False} if "sqlite" in database_url else {}
         )
         self.SessionLocal = sessionmaker(bind=self.engine)
