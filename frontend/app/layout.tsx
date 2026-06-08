@@ -4,6 +4,7 @@ import "./globals.css"
 import { cn } from "@/lib/utils"
 import { UserProvider } from "@/components/providers/user-provider"
 import { Toaster } from "@/components/ui/sonner"
+import { DevBanner } from "@/components/layout/dev-banner"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,6 +33,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <UserProvider>
+          <DevBanner />
           {children}
           <Toaster position="top-center" />
         </UserProvider>
