@@ -9,6 +9,12 @@ dependencies = [
   "uvicorn[standard]",
 ]
 
+[tool.setuptools]
+packages = ["hgs_refuce_app"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
 [tool.pytest.ini_options]
 addopts = "-q"
 pythonpath = ["src"]
