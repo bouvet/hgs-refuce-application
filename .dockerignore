@@ -1,0 +1,12 @@
+.git
+.github
+frontend
+.env
+.venv
+antenv
+*.pyc
+__pycache__
+.pytest_cache
+.egg-info
+*.egg-info
+node_modules
