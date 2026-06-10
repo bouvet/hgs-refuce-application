@@ -52,5 +52,5 @@ jobs:
         with:
           app-name: "WasteFlow"
           slot-name: "Production"
-          package: frontend
+          package: .
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_9D0A9F967409423A9F95E86A5CF19583 }}
