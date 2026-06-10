@@ -42,7 +42,7 @@ jobs:
         with:
           app-name: hgs-refuce-backend
           package: backend_fast_api/
-          startup-file: 'startup.sh
+          startup-file: 'startup.sh'
 
       # 🚫 Opting Out of Oryx Build
       # If you prefer to disable the Oryx build process during deployment, follow these steps:
