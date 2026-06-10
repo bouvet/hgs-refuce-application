@@ -22,15 +22,12 @@ jobs:
                        -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/hgs-refuce-backend:latest .
 
       - name: Login to ACR
-        run: |
-          docker login ${{ secrets.REGISTRY_LOGIN_SERVER }} \
-            -u ${{ secrets.REGISTRY_USERNAME }} \
-            -p ${{ secrets.REGISTRY_PASSWORD }}
+        run: docker login -u ${{ secrets.REGISTRY_USERNAME }} -p ${{ secrets.REGISTRY_PASSWORD }} ${{ secrets.REGISTRY_LOGIN_SERVER }}
 
       - name: Push Docker image to ACR
         run: |
-          docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/hgs-refuce-backend:${{ github.sha }}
           docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/hgs-refuce-backend:latest
+          docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/hgs-refuce-backend:${{ github.sha }}
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
