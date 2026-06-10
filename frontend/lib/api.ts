@@ -17,7 +17,7 @@ async function request<T>(
   init?: RequestInit & { params?: Record<string, string | undefined> },
   userId?: string,
 ): Promise<T> {
-  const url = new URL(path, apiBaseUrl);
+  const url = new URL(apiBaseUrl + path);
   if (init?.params) {
     for (const [k, v] of Object.entries(init.params)) {
       if (v !== undefined) url.searchParams.set(k, v);
