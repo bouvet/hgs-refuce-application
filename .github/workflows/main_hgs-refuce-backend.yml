@@ -37,13 +37,6 @@ jobs:
           path: |
             backend_fast_api/
 
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: hgs-refuce-backend
-          package: backend_fast_api/
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_4CFE0F43E9D94A6E8B8130C1D7CD03CF }}
-          startup-command: 'bash startup.sh'
 
       # 🚫 Opting Out of Oryx Build
       # If you prefer to disable the Oryx build process during deployment, follow these steps:
