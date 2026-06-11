@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **hgs-refuce-application** — tracks refuse/waste from a local Bouvet office. Two sub-projects:
 
-- `backend_fast_api/` — Python + FastAPI + SQLite
+- `backend_fast_api/` — Python + FastAPI + SQLAlchemy (SQLite locally, PostgreSQL in production)
 - `frontend/` — Next.js 16, TypeScript, Tailwind CSS v4, shadcn/UI
 
 Each sub-project has its own `CLAUDE.md` with detailed guidance. Read those before working in the respective sub-project.
@@ -56,20 +56,24 @@ npm run lint    # ESLint
 ### Overall data flow
 
 ```
-user → frontend → backend → SQLite (data.db)
+user → frontend → backend → SQLite (dev) / PostgreSQL (prod)
 ```
 
 The backend is the authority on data shape. The frontend calls the backend for all waste registration and report data via `lib/data/backend-waste-repository.ts`. The only remaining `localStorage` use is role/user selection (`boss-app:current-user` in `UserProvider`).
 
 ### Backend
 
-- `src/hgs_refuce_app/main.py` — FastAPI app; default port 8000, CORS allows `http://localhost:3000` by default
-  - `GET/POST /registrations` — list (with optional `date`, `period`, `from`/`to` query params) and create
-  - `GET/PUT/DELETE /registrations/{id}` — get, update, delete a registration
-  - `GET/POST /reports` — list and submit a quarterly report (locks that quarter)
-  - `GET/DELETE /reports/{period}` — get or delete (unlock) a report
-- `src/hgs_refuce_app/storage.py` — `Storage` class wrapping a single SQLite connection (`data.db`, `check_same_thread=False`)
-- `src/hgs_refuce_app/models.py` — Pydantic models: `WasteRegistration`, `WasteCategoryEntry`, `Report`, `SubmitReportRequest`
+- `src/hgs_refuce_app/main.py` — FastAPI app; default port 8000, CORS origins controlled by `BACKEND_CORS_ORIGINS` env var (defaults to `http://localhost:3000`)
+  - `POST /auth/login` — authenticate a user
+  - `GET/POST /locations` — list user's locations or create one (super-admin)
+  - `GET/POST /locations/{id}/registrations` — list/create waste registrations for a location
+  - `GET/PUT/DELETE /locations/{id}/registrations/{id}` — get, update, delete a registration
+  - `GET/POST /locations/{id}/reports` — list/submit a quarterly report (locks that quarter)
+  - `GET/DELETE /locations/{id}/reports/{period}` — get or delete (unlock) a report
+  - `GET/POST/DELETE /users`, `/locations/{id}/users` — user management (admin)
+  - `GET/POST /admin/locations`, `/admin/users` — developer-only endpoints (require `ADMIN_SECRET` header)
+- `src/hgs_refuce_app/storage.py` — `DatabaseConnection`, `UserStorage`, `DataStorage` classes using SQLAlchemy (SQLite dev / PostgreSQL prod)
+- `src/hgs_refuce_app/models.py` — Pydantic models: `WasteRegistration`, `Report`, `Location`, `User`, etc.
 
 Tests use FastAPI's `TestClient` against the live app instance and clear the DB with `setup_function()` between tests.
 
