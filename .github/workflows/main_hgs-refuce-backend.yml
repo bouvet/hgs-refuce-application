@@ -63,6 +63,6 @@ jobs:
         id: deploy-to-webapp
         with:
           app-name: 'hgs-refuce-backend'
-          package: './artifact/backend_fast_api/'
+          package: './artifact/'
           slot-name: 'Production'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_BACKEND }}
