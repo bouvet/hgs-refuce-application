@@ -52,27 +52,49 @@ Change the level via the `LOG_LEVEL` env var, or edit `DEFAULT_LEVEL` in `loggin
 
 ## Azure Deployment
 
+### Resources
+
+- **App Service**: `hgs-refuce-backend` (Linux, connected to `hgs-refuce-frontend-plan`)
+- **Database**: `hgs-refuce-db-server` — Azure Database for PostgreSQL Flexible Server, database `wasteflow`
+- **Frontend**: `Wasteflow` App Service at `https://wasteflow.azurewebsites.net`
+
+### Startup command
+
+Set in Azure Portal → App Service → Configuration → Stack settings → Startup Command:
+
+```
+python3 -m uvicorn hgs_refuce_app.main:app --app-dir src --host 0.0.0.0 --port 8000
+```
+
+`--app-dir src` adds `src/` to `sys.path` so `hgs_refuce_app` is importable. Alternatively, `gunicorn.conf.py` at the repo root configures gunicorn with uvicorn workers and `pythonpath = "src"`, usable with:
+
+```
+python3 -m gunicorn hgs_refuce_app.main:app -c gunicorn.conf.py
+```
+
 ### Environment Variables
 
 Set these on the Azure App Service via **Settings → Configuration → Application settings**:
 
 | Variable | Example | Notes |
 |----------|---------|-------|
-| `DATABASE_URL` | `postgresql://sktxengsxj:PASSWORD@wasteflow-backend-server.postgres.database.azure.com:5432/wasteflow` | PostgreSQL connection string |
-| `BACKEND_CORS_ORIGINS` | `https://frontend.azurewebsites.net` | Frontend URL for CORS |
+| `APP_ENV` | `production` | Required — enables PostgreSQL and production logging |
+| `DATABASE_URL` | `postgresql://dbadmin:PASSWORD@hgs-refuce-db-server.postgres.database.azure.com:5432/wasteflow?sslmode=require` | PostgreSQL Flexible Server connection string — note: no `@servername` suffix in username, `?sslmode=require` required |
+| `BACKEND_CORS_ORIGINS` | `https://wasteflow.azurewebsites.net` | Frontend URL for CORS |
 | `ADMIN_SECRET` | (generate a secure random string) | Used for admin endpoints |
 
 ### Database Setup
 
-1. Create the database in PostgreSQL (replace `PASSWORD` with the actual password):
-   ```bash
-   psql -h wasteflow-backend-server.postgres.database.azure.com -U sktxengsxj -d postgres
-   CREATE DATABASE wasteflow;
-   ```
+The `wasteflow` database on `hgs-refuce-db-server` already exists. Tables are created automatically on first app startup.
 
-2. Set `DATABASE_URL` on the App Service to point to this database.
+To connect manually (e.g. to inspect data):
+```bash
+psql -h hgs-refuce-db-server.postgres.database.azure.com -U dbadmin -d wasteflow
+```
 
-3. Tables are created automatically on first app startup.
+### Firewall
+
+The App Service outbound IPs must be allowed in the PostgreSQL server's networking rules (or enable "Allow public access from any Azure service within Azure"). Check current outbound IPs at App Service → Properties → Outbound IP addresses.
 
 ## Planned but not yet implemented
 
