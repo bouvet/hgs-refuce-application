@@ -53,12 +53,16 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: python-app
+          path: ./artifact
+
+      - name: List downloaded files
+        run: find ./artifact -maxdepth 3 | head -30
 
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
         with:
           app-name: 'hgs-refuce-backend'
-          package: 'backend_fast_api/'
+          package: './artifact/backend_fast_api/'
           slot-name: 'Production'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_BACKEND }}
