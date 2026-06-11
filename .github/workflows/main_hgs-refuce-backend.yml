@@ -62,4 +62,3 @@ jobs:
           package: 'python-app/backend_fast_api/'
           slot-name: 'Production'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_BACKEND }}
-          startup-command: 'bash startup.sh'
