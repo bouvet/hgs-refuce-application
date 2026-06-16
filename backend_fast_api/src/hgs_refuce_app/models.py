@@ -56,3 +56,18 @@ class LoginRequest(BaseModel):
 
 class CreateLocationRequest(BaseModel):
     name: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: User
+
+
+class TokenData(BaseModel):
+    user_id: str
+    exp: int
+
+
+class AzureADTokenRequest(BaseModel):
+    id_token: str
