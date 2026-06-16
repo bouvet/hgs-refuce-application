@@ -2,12 +2,14 @@ import logging
 import os
 import time
 from contextlib import asynccontextmanager
+from datetime import timedelta
 from sqlalchemy import text
 from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException, Query, Request, Response, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBearer
 
 from .logging_config import flush_logs, setup_logging
 from .models import (
@@ -20,8 +22,11 @@ from .models import (
     CreateLocationRequest,
     LocationUserEntry,
     LoginRequest,
+    TokenResponse,
+    AzureADTokenRequest,
 )
 from .storage import UserStorage, DataStorage, DatabaseConnection, date_to_quarter
+from .security import create_access_token, verify_token
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -127,10 +132,22 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def get_user_id(x_user_id: Optional[str] = Header(None)) -> str:
-    if not x_user_id:
-        raise HTTPException(status_code=401, detail="X-User-Id header required")
-    return x_user_id
+security = HTTPBearer(auto_error=False)
+
+
+def get_user_id(
+    credentials: Optional[object] = Depends(security),
+    x_user_id: Optional[str] = Header(None),
+) -> str:
+    if credentials:
+        try:
+            user_id = verify_token(credentials.credentials)
+            return user_id
+        except HTTPException:
+            raise
+    elif x_user_id:
+        return x_user_id
+    raise HTTPException(status_code=401, detail="Authentication required")
 
 
 def get_admin_secret(x_admin_secret: Optional[str] = Header(None)) -> str:
@@ -238,7 +255,7 @@ def admin_add_user_to_location(
 
 # ---------- auth endpoints ----------
 
-@app.post("/auth/login", response_model=User)
+@app.post("/auth/login", response_model=TokenResponse)
 def login(req: LoginRequest):
     if not user_storage.user_exists(req.username):
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -247,6 +264,67 @@ def login(req: LoginRequest):
     user = user_storage.get_user(req.username)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    access_token = create_access_token(data={"sub": user.id})
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user=user
+    )
+
+
+@app.post("/auth/sso-login", response_model=TokenResponse)
+def sso_login(req: AzureADTokenRequest):
+    """
+    Azure AD SSO login endpoint.
+    Expects an id_token from Azure AD in the request body.
+    The token should be verified against Azure AD's public keys.
+    """
+    import base64
+    import json
+
+    try:
+        parts = req.id_token.split(".")
+        if len(parts) != 3:
+            raise HTTPException(status_code=401, detail="Invalid token format")
+
+        payload = parts[1]
+        padding = 4 - (len(payload) % 4)
+        if padding != 4:
+            payload += "=" * padding
+
+        decoded = json.loads(base64.urlsafe_b64decode(payload))
+        user_id = decoded.get("preferred_username") or decoded.get("oid")
+
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token: no user identifier")
+
+        if not user_storage.user_exists(user_id):
+            logger.info("auto-creating user from Azure AD: %s", user_id)
+            user_storage.create_user(user_id, is_admin=False)
+
+        user = user_storage.get_user(user_id)
+        if not user:
+            raise HTTPException(status_code=401, detail="Failed to authenticate user")
+
+        access_token = create_access_token(data={"sub": user.id})
+        return TokenResponse(
+            access_token=access_token,
+            token_type="bearer",
+            user=user
+        )
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    except Exception as e:
+        logger.error("SSO login error: %s", e)
+        raise HTTPException(status_code=401, detail="Authentication failed")
+
+
+@app.get("/auth/me", response_model=User)
+def get_current_user(user_id: str = Depends(get_user_id)):
+    user = user_storage.get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
     return user
 
 
