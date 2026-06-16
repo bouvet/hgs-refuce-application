@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react"
 import { UserContext } from "@/lib/user-context"
+import { setToken, clearToken } from "@/lib/auth"
 import type { User } from "@/lib/types"
 
 const USER_KEY = "boss-app:current-user"
@@ -64,7 +65,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       window.localStorage.setItem(USER_KEY, JSON.stringify(u))
     } else {
       window.localStorage.removeItem(USER_KEY)
+      clearToken()
     }
+    localListeners.forEach(listener => listener())
+  }
+
+  function setUserWithToken(u: User, token: string) {
+    window.localStorage.setItem(USER_KEY, JSON.stringify(u))
+    setToken(token)
     localListeners.forEach(listener => listener())
   }
 
@@ -78,7 +86,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <UserContext value={{ user, setUser, locationId, setLocationId }}>
+    <UserContext value={{ user, setUser, setUserWithToken, locationId, setLocationId }}>
       {children}
     </UserContext>
   )
