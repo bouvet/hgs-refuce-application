@@ -5,7 +5,6 @@ from datetime import datetime
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from .models import WasteRegistration, Report, Location, User
-from .security import hash_password, verify_password
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +112,6 @@ class UserStorage:
     def create_user(self, user_id: str, is_admin: bool, password: Optional[str] = None, is_super_admin: bool = False) -> None:
         with self.engine.connect() as conn:
             created_at = datetime.utcnow().isoformat()
-            hashed_password = hash_password(password) if password else None
             conn.execute(text("""
                 INSERT INTO users (id, is_admin, is_super_admin, password, created_at)
                 VALUES (:id, :is_admin, :is_super_admin, :password, :created_at)
@@ -121,7 +119,7 @@ class UserStorage:
                 "id": user_id,
                 "is_admin": 1 if is_admin else 0,
                 "is_super_admin": 1 if is_super_admin else 0,
-                "password": hashed_password,
+                "password": password,
                 "created_at": created_at
             })
             conn.commit()
@@ -146,9 +144,7 @@ class UserStorage:
         with self.engine.connect() as conn:
             result = conn.execute(text("SELECT password FROM users WHERE id = :id"), {"id": user_id})
             row = result.fetchone()
-            if not row or not row[0]:
-                return False
-            return verify_password(password, row[0])
+            return bool(row and row[0] == password) if row else False
 
     def list_users(self) -> List[User]:
         with self.engine.connect() as conn:
@@ -164,18 +160,6 @@ class UserStorage:
             conn.execute(text("DELETE FROM users WHERE id = :id"), {"id": user_id})
             conn.commit()
             logger.debug("deleted user %s", user_id)
-
-    def update_password(self, user_id: str, new_password: str) -> bool:
-        with self.engine.connect() as conn:
-            hashed_password = hash_password(new_password)
-            result = conn.execute(text("""
-                UPDATE users SET password = :password WHERE id = :id
-            """), {"id": user_id, "password": hashed_password})
-            conn.commit()
-            success = result.rowcount > 0
-            if success:
-                logger.debug("updated password for user %s", user_id)
-            return success
 
     def create_location(self, name: str) -> str:
         with self.engine.connect() as conn:

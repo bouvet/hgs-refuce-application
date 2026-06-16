@@ -13,7 +13,7 @@ const REMEMBERED_LOCATION_KEY = "boss-app:remembered-location";
 export function RoleSelector() {
   const router = useRouter();
   const { user, setUser } = useCurrentUser();
-  const { locationId, setLocationId, setUserWithToken } = useContext(UserContext);
+  const { locationId, setLocationId } = useContext(UserContext);
   const [step, setStep] = useState<"role" | "login" | "superadmin" | "location">("role");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -81,14 +81,14 @@ export function RoleSelector() {
     try {
       setLoading(true);
       setError("");
-      const tokenResponse = await api.login(username, password);
+      const user = await api.login(username, password);
       const u: User = {
-        id: tokenResponse.user.id,
+        id: user.id,
         name: "Super-admin",
         role: "admin",
         isSuperAdmin: true,
       };
-      setUserWithToken(u, tokenResponse.access_token);
+      setUser(u);
       setStep("location");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Innlogging feilet");
@@ -101,67 +101,24 @@ export function RoleSelector() {
     try {
       setLoading(true);
       setError("");
-      const tokenResponse = await api.login(username, password);
-      if (tokenResponse.user.isSuperAdmin) {
+      const backendUser = await api.login(username, password);
+      if (backendUser.isSuperAdmin) {
         setError("Bruk super-admin innlogging for denne brukeren");
         return;
       }
       const u: User = {
-        id: tokenResponse.user.id,
-        name: tokenResponse.user.id,
-        role: tokenResponse.user.isAdmin ? "admin" : "common",
+        id: backendUser.id,
+        name: backendUser.id,
+        role: backendUser.isAdmin ? "admin" : "common",
         isSuperAdmin: false,
       };
-      setUserWithToken(u, tokenResponse.access_token);
+      setUser(u);
       setStep("location");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Innlogging feilet");
     } finally {
       setLoading(false);
     }
-  }
-
-  async function loginWithAzureAD() {
-    try {
-      setLoading(true);
-      setError("");
-      const idToken = await getAzureADToken();
-      const tokenResponse = await api.ssoLogin(idToken);
-      const u: User = {
-        id: tokenResponse.user.id,
-        name: tokenResponse.user.id,
-        role: tokenResponse.user.isAdmin ? "admin" : "common",
-        isSuperAdmin: tokenResponse.user.isSuperAdmin || false,
-      };
-      setUserWithToken(u, tokenResponse.access_token);
-      setStep("location");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Azure AD innlogging feilet");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function getAzureADToken(): Promise<string> {
-    const clientId = process.env.NEXT_PUBLIC_AZURE_AD_CLIENT_ID;
-    const tenantId = process.env.NEXT_PUBLIC_AZURE_AD_TENANT_ID;
-
-    if (!clientId || !tenantId) {
-      throw new Error("Azure AD is not configured");
-    }
-
-    const redirectUri = window.location.origin;
-    const scope = `${clientId}/.default`;
-    const authUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?` +
-      `client_id=${clientId}&` +
-      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-      `response_type=id_token&` +
-      `scope=${encodeURIComponent(scope)}&` +
-      `nonce=${Math.random().toString(36).substring(7)}&` +
-      `response_mode=fragment`;
-
-    window.location.href = authUrl;
-    return new Promise(() => {});
   }
 
   function selectLocation() {
@@ -380,13 +337,10 @@ export function RoleSelector() {
         </p>
       </div>
 
-      {error && <p className="text-sm text-red-500 text-center">{error}</p>}
-
       <div className="flex flex-col gap-3 w-full">
         <button
           onClick={() => setStep("login")}
-          disabled={loading}
-          className="flex items-center gap-4 w-full rounded-xl border border-border bg-card p-5 text-left transition-colors hover:bg-accent hover:border-accent-foreground/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-default"
+          className="flex items-center gap-4 w-full rounded-xl border border-border bg-card p-5 text-left transition-colors hover:bg-accent hover:border-accent-foreground/20 active:scale-[0.98]"
         >
           <div className="flex items-center justify-center size-12 rounded-xl bg-primary/10 text-primary shrink-0">
             <Users className="size-6" />
@@ -401,8 +355,7 @@ export function RoleSelector() {
 
         <button
           onClick={() => selectRole("admin")}
-          disabled={loading}
-          className="flex items-center gap-4 w-full rounded-xl border border-border bg-card p-5 text-left transition-colors hover:bg-accent hover:border-accent-foreground/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-default"
+          className="flex items-center gap-4 w-full rounded-xl border border-border bg-card p-5 text-left transition-colors hover:bg-accent hover:border-accent-foreground/20 active:scale-[0.98]"
         >
           <div className="flex items-center justify-center size-12 rounded-xl bg-primary/10 text-primary shrink-0">
             <ShieldCheck className="size-6" />
@@ -417,8 +370,7 @@ export function RoleSelector() {
 
         <button
           onClick={() => setStep("superadmin")}
-          disabled={loading}
-          className="flex items-center gap-4 w-full rounded-xl border border-border bg-card p-5 text-left transition-colors hover:bg-accent hover:border-accent-foreground/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-default"
+          className="flex items-center gap-4 w-full rounded-xl border border-border bg-card p-5 text-left transition-colors hover:bg-accent hover:border-accent-foreground/20 active:scale-[0.98]"
         >
           <div className="flex items-center justify-center size-12 rounded-xl bg-primary/10 text-primary shrink-0">
             <Lock className="size-6" />
@@ -430,16 +382,6 @@ export function RoleSelector() {
             </div>
           </div>
         </button>
-
-        {process.env.NEXT_PUBLIC_AZURE_AD_CLIENT_ID && (
-          <button
-            onClick={loginWithAzureAD}
-            disabled={loading}
-            className="w-full h-11 rounded-xl font-semibold border border-border bg-card hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-default"
-          >
-            {loading ? "Logger inn..." : "Logg inn med Azure AD"}
-          </button>
-        )}
       </div>
     </div>
   );

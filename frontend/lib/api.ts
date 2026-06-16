@@ -1,5 +1,4 @@
-import type { User, AdminUser, Location, TokenResponse } from "@/lib/types";
-import { getToken, getAuthHeaders } from "@/lib/auth";
+import type { User, AdminUser, Location } from "@/lib/types";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -29,11 +28,7 @@ async function request<T>(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-
-  const token = getToken();
-  if (token) {
-    Object.assign(headers, getAuthHeaders());
-  } else if (userId) {
+  if (userId) {
     headers["X-User-Id"] = userId;
   }
 
@@ -58,17 +53,10 @@ async function request<T>(
 }
 
 export const api = {
-  login: async (username: string, password: string): Promise<TokenResponse> => {
-    return request<TokenResponse>("/auth/login", {
+  login: async (username: string, password: string): Promise<AdminUser> => {
+    return request<AdminUser>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ username, password }),
-    });
-  },
-
-  ssoLogin: async (idToken: string): Promise<TokenResponse> => {
-    return request<TokenResponse>("/auth/sso-login", {
-      method: "POST",
-      body: JSON.stringify({ id_token: idToken }),
     });
   },
 
