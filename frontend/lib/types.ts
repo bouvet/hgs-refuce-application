@@ -47,9 +47,3 @@ export type AdminUser = {
   isAdmin: boolean;
   isSuperAdmin: boolean;
 };
-
-export type TokenResponse = {
-  access_token: string;
-  token_type: string;
-  user: AdminUser;
-};
