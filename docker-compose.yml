@@ -4,7 +4,7 @@ services:
       context: ./backend_fast_api
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "8010:8000"
     environment:
       APP_ENV: development
       DATABASE_URL: sqlite:////app/data/app.db

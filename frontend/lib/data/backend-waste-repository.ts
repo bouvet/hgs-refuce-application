@@ -36,7 +36,8 @@ export class BackendWasteRepository implements WasteRepository {
   ) {}
 
   private url(path: string, params?: Record<string, string | undefined>): string {
-    const u = new URL(this.baseUrl + path);
+    const base = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+    const u = new URL(this.baseUrl + path, base);
     if (params) {
       for (const [k, v] of Object.entries(params)) {
         if (v !== undefined) u.searchParams.set(k, v);
