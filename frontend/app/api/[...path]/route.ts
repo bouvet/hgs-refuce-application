@@ -9,7 +9,7 @@ async function handler(
   { params }: { params: Promise<Params> },
 ): Promise<NextResponse> {
   const { path } = await params;
-  const backendUrl = new URL("/" + path.join("/"), BACKEND_URL);
+  const backendUrl = new URL("/" + path.join("/"), BACKEND_URL.includes("://") ? BACKEND_URL : req.nextUrl);
 
   req.nextUrl.searchParams.forEach((value, key) => {
     backendUrl.searchParams.set(key, value);
