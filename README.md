@@ -15,3 +15,19 @@ LOG_LEVEL=INFO
 LOG_DIR=./logs
 LOG_BUFFER_CAPACITY=1000
 ```
+
+To test localy
+```
+    # First time
+     cp .env.example .env
+     # Edit .env — fill in SECRET_KEY and ADMIN_SECRET
+
+     # Build and start
+     docker compose up --build
+
+     # Subsequent runs (no code changes)
+     docker compose up
+
+     # Clean slate (wipe the database volume)
+     docker compose down -v
+```

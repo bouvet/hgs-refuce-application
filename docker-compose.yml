@@ -1,0 +1,37 @@
+services:
+  backend:
+    build:
+      context: ./backend_fast_api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: development
+      DATABASE_URL: sqlite:////app/data/app.db
+      BACKEND_CORS_ORIGINS: http://localhost:3000
+      SECRET_KEY: ${SECRET_KEY}
+      ADMIN_SECRET: ${ADMIN_SECRET}
+      LOG_LEVEL: INFO
+    volumes:
+      - backend_data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      BACKEND_API_URL: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  backend_data:
