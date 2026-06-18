@@ -20,7 +20,7 @@ export interface WasteRepository {
   getReportForDate(date: string): Promise<Report | null>;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8010";
+const API_URL = "/api";
 
 export function createWasteRepository(
   locationId: string,

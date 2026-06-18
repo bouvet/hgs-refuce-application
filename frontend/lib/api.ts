@@ -1,6 +1,6 @@
 import type { User, AdminUser, Location } from "@/lib/types";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8010";
+const apiBaseUrl = "/api";
 
 class ApiError extends Error {
   constructor(
@@ -17,7 +17,10 @@ async function request<T>(
   init?: RequestInit & { params?: Record<string, string | undefined> },
   userId?: string,
 ): Promise<T> {
-  const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+  const origin =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "http://localhost:3000";
   const url = new URL(apiBaseUrl + path, origin);
   if (init?.params) {
     for (const [k, v] of Object.entries(init.params)) {
@@ -132,7 +135,10 @@ export const api = {
     );
   },
 
-  listLocationUsers: async (userId: string, locationId: string): Promise<string[]> => {
+  listLocationUsers: async (
+    userId: string,
+    locationId: string,
+  ): Promise<string[]> => {
     return request<string[]>(
       `/locations/${encodeURIComponent(locationId)}/users`,
       {},

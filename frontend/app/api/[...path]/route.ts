@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND_URL = process.env.BACKEND_API_URL ?? "http://localhost:8000";
+//Set BACKEND_API_URL to localhost port in env.local to run local backend
+//otherwise it will run NEXT_PUBLIC_API_URL that is set to azure backend url
+const BACKEND_URL =
+  process.env.BACKEND_API_URL ??
+  process.env.NEXT_PUBLIC_API_URL ??
+  "http://localhost:8000";
 
 type Params = { path: string[] };
 
@@ -9,7 +14,10 @@ async function handler(
   { params }: { params: Promise<Params> },
 ): Promise<NextResponse> {
   const { path } = await params;
-  const backendUrl = new URL("/" + path.join("/"), BACKEND_URL.includes("://") ? BACKEND_URL : req.nextUrl);
+  const backendUrl = new URL(
+    "/" + path.join("/"),
+    BACKEND_URL.includes("://") ? BACKEND_URL : req.nextUrl,
+  );
 
   req.nextUrl.searchParams.forEach((value, key) => {
     backendUrl.searchParams.set(key, value);
