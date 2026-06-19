@@ -86,6 +86,36 @@ Tests use FastAPI's `TestClient` against the live app instance and clear the DB 
 - **Styling**: Tailwind CSS v4 — config is in `app/globals.css`, not a config file. Uses oklch colors.
 - **UI components**: shadcn/UI `base-vega` style (uses `@base-ui/react`, not Radix UI). Add with `npx shadcn@latest add <name>`.
 
+## Knowledge Base
+
+This repository maintains a structured, externalized mental model across sessions. The system has **four tiers**:
+
+| Tier | Location | Purpose |
+|------|----------|---------|
+| 1 | `CLAUDE.md` (this file) | Project overview, navigation hub, constraints |
+| 2 | `.claude/instructions/` | Conventions/rules per file type — **how to work** |
+| 3 | `.claude/knowledge/` | Living mental model — **how it works & why** |
+| 4 | `.claude/skills/` | Multi-step workflows — **how to do X** |
+
+**Knowledge files by domain:**
+- **backend-api.md** — FastAPI routes, endpoints, request handling
+- **database-layer.md** — SQLAlchemy, models, storage, schema
+- **frontend-architecture.md** — Next.js routing, layouts, pages, environment
+- **component-structure.md** — React components, shadcn/UI, layout patterns
+- **data-repository.md** — WasteRepository pattern, backend integration
+- **auth-rbac.md** — Authentication, roles, UserProvider, authorization
+- **build-deploy.md** — Docker, CI/CD, startup scripts, environment variables
+
+### Read/Write Gates
+
+> **Read gate:** Before editing any file in `backend_fast_api/src/` or `frontend/(app|components|lib)/`, or making a non-trivial change anywhere, you MUST first read the knowledge files that cover the affected domain. This rebuilds the mental model — state ownership, invariants, design rationale — so you can spot when a proposed change contradicts an earlier `DECIDED` entry and push back rather than silently regress it. Trivial edits (typos, comments, formatting) are exempt.
+
+> **Write gate:** During or after any task, if you discover a new invariant, state-ownership fact, data-flow edge, design decision, or tension that is not already in a knowledge file, you MUST add it to the correct file using the structured notation (OWNS / READS FROM / WRITES TO / INVARIANT / FLOW / TENSION / DECIDED). These files are your externalized mental model — if you don't write it down, the next session will rediscover it from scratch.
+
+> **Rule of thumb:** If a change contradicts a `DECIDED` entry in the knowledge base, cite the entry and ask the human to justify overriding it before implementing. Past decisions have context; don't silently reverse them.
+
+**Retrospective:** After any non-trivial task, run `/retrospective` to review what was learned and update the knowledge base accordingly.
+
 ## Planned / not yet implemented
 
 - Authentication and authorization (admin vs. regular user, currently client-side only)
