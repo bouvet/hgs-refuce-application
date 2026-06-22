@@ -116,7 +116,9 @@ related:
 
 - OWNS: Better Auth `rateLimit` config — `/sign-in/pin: { window: 60, max: 5 }` (5 PIN attempts per minute per IP)
 - INVARIANT: `BETTER_AUTH_SECRET` is **required** (via `authEnv.secret`) and passed explicitly to `betterAuth({ secret })` — the app fails loud on boot if it's unset (no implicit/auto secret)
-- INVARIANT: Microsoft `tenantId` is **required** (`MICROSOFT_TENANT_ID`, no `"common"` default) — pinned to the Bouvet tenant so arbitrary Microsoft accounts can't authenticate
+- INVARIANT: `AUTH_DATABASE_URL` (Better Auth Postgres) and the FastAPI `DATABASE_URL` are **different databases on different servers** — deliberately different env var names to prevent accidental aliasing. They must never share a connection pool. In docker-compose the `postgres_ba` service owns `refuce_auth`; the backend uses SQLite (dev) or its own Postgres (prod). No cross-database queries exist.
+- INVARIANT: `BACKEND_SHARED_SECRET` is **required** (`authEnv.backendSharedSecret`) — used to HMAC-sign every proxied request and every service-to-service call. App throws on boot if unset. Must match the FastAPI `BACKEND_SHARED_SECRET` env var.
+- INVARIANT: Microsoft `tenantId` is **required** (`MICROSOFT_TENANT_ID`, no `"common"` default) — pinned to the Bouvet tenant so arbitrary Microsoft accounts can't authenticate. `.env.local` currently has `"common"` for local dev convenience; this MUST be replaced with the Bouvet tenant id before any production/staging deployment.
 - INVARIANT: secure cookies enabled in production (`useSecureCookies: process.env.NODE_ENV === "production"`)
 - INVARIANT: cookie prefix `"avfall"` (custom — ensure `getSessionCookie` callers pass `{ cookiePrefix: "avfall" }`)
 - INVARIANT: `trustedOrigins: [authEnv.baseURL]` — set `BETTER_AUTH_URL` to the public frontend origin in each environment
