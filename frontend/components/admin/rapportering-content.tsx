@@ -110,10 +110,10 @@ export function RapporteringContent() {
         </div>
         {periods
           .filter((p) => {
-            const isCurrentOpen = p === currentPeriod && !currentReport;
+            if (p === currentPeriod) return false;
             const regs = regsInQuarter(registrations, p);
             const report = reports.find((r) => r.period === p);
-            return !isCurrentOpen && (regs.length > 0 || report);
+            return regs.length > 0 || report;
           })
           .concat(currentReport ? [currentPeriod] : [])
           .sort((a, b) => b.localeCompare(a))

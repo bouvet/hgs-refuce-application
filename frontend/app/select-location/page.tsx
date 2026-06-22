@@ -1,9 +1,7 @@
-import { redirect } from "next/navigation";
 import { Leaf } from "lucide-react";
 import { requireSession, getBackendUserId } from "@/lib/server-session";
 import { getCurrentUser } from "@/lib/server-currentUser";
 import { LocationPicker } from "./location-picker";
-import { setCurrentLocation } from "./actions";
 
 function CenteredNotice({
   title,
@@ -54,11 +52,6 @@ export default async function SelectLocationPage() {
     );
   }
 
-  // Already chosen — bounce them back to the app.
-  if (currentUser.preferredLocationId) {
-    redirect("/oversikt");
-  }
-
   if (currentUser.locations.length === 0) {
     return (
       <CenteredNotice
@@ -69,16 +62,15 @@ export default async function SelectLocationPage() {
     );
   }
 
-  if (currentUser.locations.length === 1) {
-    await setCurrentLocation(currentUser.locations[0].id);
-    redirect("/oversikt");
-  }
+  // Pre-select the preferred location if set, otherwise fall back to the first.
+  const defaultLocationId =
+    currentUser.preferredLocationId ?? currentUser.locations[0].id;
 
   return (
     <main className="flex flex-col flex-1 items-center justify-center min-h-screen bg-background px-4">
       <LocationPicker
         locations={currentUser.locations}
-        defaultLocationId={currentUser.locations[0].id}
+        defaultLocationId={defaultLocationId}
       />
     </main>
   );

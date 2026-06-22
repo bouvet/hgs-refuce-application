@@ -12,6 +12,7 @@ import {
   Plus,
   History,
   Settings,
+  MapPin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -72,7 +73,7 @@ const allLinks = [
 export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user } = useCurrentUser();
+  const { user, locationName } = useCurrentUser();
   const isAdmin = user?.role === "admin" || user?.role === "superadmin";
   const isSuperAdmin = user?.role === "superadmin";
 
@@ -145,6 +146,13 @@ export function AppSidebar() {
         <div className="text-[13px] font-semibold text-foreground mt-0.5">
           {user?.name ?? "Bruker"}
         </div>
+        <Link
+          href="/select-location"
+          className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground mt-1.5 transition-colors"
+        >
+          <MapPin className="size-3 shrink-0" />
+          <span className="truncate">{locationName ?? "Velg lokasjon"}</span>
+        </Link>
         <button
           onClick={handleLogout}
           className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground mt-2 transition-colors"

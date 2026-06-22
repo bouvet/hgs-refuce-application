@@ -18,9 +18,12 @@ import { useSessionData } from "@/components/providers/session-provider";
 export function useCurrentUser(): {
   user: User | null;
   locationId: string | null;
+  locationName: string | null;
   isPending: boolean;
 } {
-  const { user, locationId } = useSessionData();
+  const { user, locationId, locations } = useSessionData();
+  const locationName =
+    locationId ? (locations.find((l) => l.id === locationId)?.name ?? null) : null;
   // Seeded synchronously by the server layout, so it is never pending.
-  return { user, locationId, isPending: false };
+  return { user, locationId, locationName, isPending: false };
 }
