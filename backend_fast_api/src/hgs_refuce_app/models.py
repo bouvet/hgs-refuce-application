@@ -56,3 +56,8 @@ class LoginRequest(BaseModel):
 
 class CreateLocationRequest(BaseModel):
     name: str
+
+
+class LoginResponse(BaseModel):
+    accessToken: str
+    user: User
