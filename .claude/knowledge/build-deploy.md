@@ -72,7 +72,7 @@ related: [backend-api, frontend-architecture]
 - OWNS: server-side env in `frontend/.env.local` — see `.env.local.example` for the full list
 - INVARIANT: `BETTER_AUTH_URL` — public origin (e.g. `https://refuse.example.com`); used for OIDC callback URLs and `trustedOrigins`
 - INVARIANT: `BETTER_AUTH_SECRET` — generate via `openssl rand -base64 32`; must be stable across deploys (rotation invalidates all sessions)
-- INVARIANT: `DATABASE_URL` — Postgres connection string for Better Auth tables (NOT the FastAPI database; can share the same Postgres server)
+- INVARIANT: `DATABASE_URL` — Postgres connection string for Better Auth tables. **Same Postgres instance as the FastAPI backend** — Better Auth tables coexist in the same database (or an isolated schema via `search_path`). No separate database instance required.
 - INVARIANT: `BACKEND_API_URL` — internal URL to FastAPI; server-side only (was `NEXT_PUBLIC_API_URL`)
 - INVARIANT: `BACKEND_SHARED_SECRET` — HMAC key shared with FastAPI; rotate by bumping `X-User-Sig-Version` and accepting both during rollover
 - INVARIANT: `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID` — Entra ID app registration credentials
@@ -85,7 +85,7 @@ related: [backend-api, frontend-architecture]
 - WRITES TO: Postgres tables `user`, `session`, `account`, `verification`
 - INVARIANT: Postgres must be running before `npm run dev` will accept any login
 - INVARIANT: re-run the migration whenever `additionalFields` or plugins with their own schema are added
-- FLOW[local_setup]: `docker run --rm -p 5432:5432 -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=auth postgres:16` → set `DATABASE_URL=postgres://postgres:dev@localhost:5432/auth` → `npx @better-auth/cli@latest migrate` → `npm run dev`
+- FLOW[local_setup]: `docker run --rm -p 5432:5432 -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=refuce postgres:16` → set `DATABASE_URL=postgres://postgres:dev@localhost:5432/refuce` (same db the FastAPI backend uses) → `npx @better-auth/cli@latest migrate` → `npm run dev`
 - DECIDED: SQLite is not supported by the current Better Auth setup (it uses the `pg` driver directly); local dev requires Postgres.
 
 ## Entra ID app registration

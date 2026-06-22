@@ -61,12 +61,13 @@ related: [backend-api, auth-rbac]
 
 ## Better Auth tables (Postgres, frontend-owned)
 
-- OWNS: a separate Postgres database (or schema) accessed by Next.js via the `pg` driver — NOT the FastAPI backend
-- OWNS: tables `user`, `session`, `account`, `verification` created by `npx @better-auth/cli@latest migrate`
-- OWNS: additional columns on `"user"` set via `additionalFields`: `backendUserId` (unique, `input: false` so clients can't supply it), `role`, `preferredLocationId`, `currentLocationId`
-- READS FROM: `DATABASE_URL` env var (the Next.js one, not the FastAPI one — they can point at the same Postgres but conventionally use separate databases)
-- WRITES TO: Better Auth manages all schema writes via the CLI; never modify these tables by hand
+- OWNS: Better Auth tables (`user`, `session`, `account`, `verification`) accessed by Next.js via the `pg` driver
+- OWNS: tables created by `npx @better-auth/cli@latest migrate` — never modify by hand
+- OWNS: additional column on `"user"` via `additionalFields`: `backendUserId` (unique, `input: false` so clients can't supply it). Role and location are NOT stored here — fetched live from FastAPI.
+- READS FROM: `DATABASE_URL` env var (frontend) — **same Postgres instance as the FastAPI backend**; tables coexist in the same database (optionally isolated via a separate schema using `search_path`)
+- WRITES TO: Better Auth manages all schema writes via the CLI
 - INVARIANT: pg pool is a singleton via `globalThis.__betterAuthPgPool` to survive dev hot reloads
-- INVARIANT: the FastAPI `User` table is NOT replaced — it still owns email/password/role on the backend side. Better Auth's `user.backendUserId` is the foreign key linking the two.
-- TENSION: two source-of-truth tables for users. Acceptable trade-off: backend keeps password/role for its own auth needs, Better Auth keeps email/session/oauth account links. Reconciled on every sign-in via `databaseHooks` (SSO) or the PIN plugin (credentials).
-- DECIDED: separate Postgres for Better Auth keeps the migration low-risk — the FastAPI schema does not need to change at all to add SSO.
+- INVARIANT: the FastAPI `User` table is NOT replaced — it still owns credentials/role on the backend side. Better Auth's `user.backendUserId` is the foreign key linking the two.
+- INVARIANT: Better Auth `user` row stores **identity only** — `backendUserId` is the sole additional field. Role, locations, and preferredLocationId are NOT mirrored here (see auth-rbac.md REFINEMENT note).
+- TENSION: two user tables in the same database. Acceptable: FastAPI owns credentials/role; Better Auth owns session/oauth. Reconciled on every sign-in.
+- DECIDED (2026-06): **Same Postgres instance as FastAPI** — no separate database needed. Reduces infrastructure overhead. Schema isolation (separate `search_path`) is optional if table name conflicts arise.
