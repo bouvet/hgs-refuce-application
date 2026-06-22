@@ -27,7 +27,7 @@ export type Report = {
   submittedBy: string;
 };
 
-export type UserRole = "common" | "admin";
+export type UserRole = "user" | "admin" | "superadmin";
 
 export type Location = {
   id: string;
@@ -35,11 +35,20 @@ export type Location = {
   createdAt: string;
 };
 
+/**
+ * Client-side view of the signed-in user, seeded by the server from the backend
+ * `/currentUser` response — see `components/providers/session-provider.tsx` and
+ * `hooks/use-current-user.ts`.
+ *
+ * `id` here is the BACKEND user id (the FastAPI primary key), not the
+ * Better Auth uuid. Consumers that pass `user.id` to API calls or store it
+ * as `createdBy` always mean the backend id. The active location is exposed
+ * separately as `locationId` (not on this type).
+ */
 export type User = {
   id: string;
   name: string;
   role: UserRole;
-  isSuperAdmin?: boolean;
 };
 
 export type AdminUser = {

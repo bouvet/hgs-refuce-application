@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useContext } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -15,7 +15,6 @@ import { createWasteRepository } from "@/lib/data/waste-repository";
 import { dateToQuarter, quarterLabel } from "@/lib/quarters";
 import { useReports } from "@/hooks/use-reports";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { UserContext } from "@/lib/user-context";
 import type { WasteRegistration } from "@/lib/types";
 
 const MONTHS = [
@@ -53,8 +52,7 @@ function getWeekDates(anchorDate: string): string[] {
 type WeightGrid = Record<string, Record<string, string>>;
 
 export function RegistrerContent() {
-  const { user } = useCurrentUser();
-  const { locationId } = useContext(UserContext);
+  const { user, locationId } = useCurrentUser();
   const { isPeriodLocked } = useReports();
   const today = new Date().toISOString().slice(0, 10);
   const [selectedDate, setSelectedDate] = useState(today);
@@ -75,7 +73,7 @@ export function RegistrerContent() {
     let cancelled = false;
     (async () => {
       if (!user?.id || !locationId) return;
-      const repo = createWasteRepository(locationId, user.id);
+      const repo = createWasteRepository(locationId);
       const prevOfFirst = new Date(weekDates[0]);
       prevOfFirst.setDate(prevOfFirst.getDate() - 1);
       const from = prevOfFirst.toISOString().slice(0, 10);
@@ -170,7 +168,7 @@ export function RegistrerContent() {
     const now = new Date().toISOString();
     const nextRegsByDate: Record<string, WasteRegistration> = { ...regsByDate };
     try {
-      const repo = createWasteRepository(locationId, user.id);
+      const repo = createWasteRepository(locationId);
       for (const d of weekDates) {
         if (isFuture(d)) continue;
         const existing = regsByDate[d];
@@ -472,7 +470,8 @@ export function RegistrerContent() {
                     const future = isFuture(d);
                     const prev = new Date(d);
                     prev.setDate(prev.getDate() - 1);
-                    const hasPrev = !!regsByDate[prev.toISOString().slice(0, 10)];
+                    const hasPrev =
+                      !!regsByDate[prev.toISOString().slice(0, 10)];
                     return (
                       <td
                         key={d}

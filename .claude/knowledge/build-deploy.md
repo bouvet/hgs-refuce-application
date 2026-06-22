@@ -66,3 +66,32 @@ related: [backend-api, frontend-architecture]
 - INVARIANT: defaults provided (CORS → localhost:3000, DATABASE_URL → sqlite:///db.sqlite)
 - INVARIANT: no .env.local in git; developers create locally
 - DECIDED: env vars for flexibility across dev/staging/prod
+
+## frontend env vars (updated for Better Auth)
+
+- OWNS: server-side env in `frontend/.env.local` — see `.env.local.example` for the full list
+- INVARIANT: `BETTER_AUTH_URL` — public origin (e.g. `https://refuse.example.com`); used for OIDC callback URLs and `trustedOrigins`
+- INVARIANT: `BETTER_AUTH_SECRET` — generate via `openssl rand -base64 32`; must be stable across deploys (rotation invalidates all sessions)
+- INVARIANT: `DATABASE_URL` — Postgres connection string for Better Auth tables (NOT the FastAPI database; can share the same Postgres server)
+- INVARIANT: `BACKEND_API_URL` — internal URL to FastAPI; server-side only (was `NEXT_PUBLIC_API_URL`)
+- INVARIANT: `BACKEND_SHARED_SECRET` — HMAC key shared with FastAPI; rotate by bumping `X-User-Sig-Version` and accepting both during rollover
+- INVARIANT: `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID` — Entra ID app registration credentials
+- DECIDED: **Reverses prior `NEXT_PUBLIC_API_URL`.** Backend URL is server-only; browser only ever calls `/api/*`.
+
+## one-time Postgres + migration setup
+
+- OWNS: Better Auth migration command `npx @better-auth/cli@latest migrate` (run from `frontend/`)
+- READS FROM: `DATABASE_URL` and `lib/auth.ts` schema definition (additional fields, plugins)
+- WRITES TO: Postgres tables `user`, `session`, `account`, `verification`
+- INVARIANT: Postgres must be running before `npm run dev` will accept any login
+- INVARIANT: re-run the migration whenever `additionalFields` or plugins with their own schema are added
+- FLOW[local_setup]: `docker run --rm -p 5432:5432 -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=auth postgres:16` → set `DATABASE_URL=postgres://postgres:dev@localhost:5432/auth` → `npx @better-auth/cli@latest migrate` → `npm run dev`
+- DECIDED: SQLite is not supported by the current Better Auth setup (it uses the `pg` driver directly); local dev requires Postgres.
+
+## Entra ID app registration
+
+- OWNS: Microsoft Entra ID (Azure AD) tenant configuration
+- INVARIANT: redirect URI must be `${BETTER_AUTH_URL}/api/auth/callback/microsoft`
+- INVARIANT: client secret has an expiry — add to renewal calendar and rotate by replacing `MICROSOFT_CLIENT_SECRET` (no code change)
+- INVARIANT: `MICROSOFT_TENANT_ID` scopes the sign-in to a specific Entra tenant; use `common` if multi-tenant
+- DECIDED: Microsoft is the SSO provider (per requirements). Other providers can be added by extending `socialProviders` in `lib/auth.ts`.

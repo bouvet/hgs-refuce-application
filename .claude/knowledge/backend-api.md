@@ -21,11 +21,22 @@ related: [database-layer, auth-rbac, data-repository]
 
 ## auth endpoints
 
-- OWNS: POST /auth/login endpoint
-- READS FROM: request body (email, password)
-- WRITES TO: returns User object with id, email, role
-- INVARIANT: role is one of `admin` or `common`
-- DECIDED: no token generation; frontend stores user state in localStorage (see UserProvider)
+- OWNS: POST /auth/login, POST /auth/sso-resolve
+- READS FROM: request body — `/auth/login` `{ username, password }`; `/auth/sso-resolve` `{ email, name? }`
+- WRITES TO: `/auth/login` returns `User { id, isAdmin, isSuperAdmin }`; `/auth/sso-resolve` returns `{ backendUserId, role }`
+- INVARIANT: role is normalized to `user | admin | superadmin` via `_role_for(user)` (`superadmin` if `isSuperAdmin`, else `admin` if `isAdmin`, else `user`)
+- INVARIANT: `/auth/sso-resolve` looks up the user by email (the backend user id) and 404s if not provisioned — it does NOT auto-create users
+- DECIDED: no token generation; the session lives in Better Auth, the backend authenticates each request via the signed `X-User-Id` header
+
+## currentUser endpoints
+
+- OWNS: GET /currentUser, PATCH /currentUser/location
+- READS FROM: `X-User-Id` (proxy-injected identity) via `get_user_id`
+- WRITES TO: GET /currentUser returns `CurrentUser { backendUserId, role, locations, preferredLocationId }`; PATCH /currentUser/location updates `users.preferred_location_id`
+- INVARIANT: GET /currentUser only returns a `preferredLocationId` the user still has access to (filtered against their locations)
+- INVARIANT: PATCH /currentUSer/location validates the location belongs to the user (403 otherwise) before persisting
+- INVARIANT: `preferred_location_id` is a nullable column on `users` (no separate table); migrated in via `ALTER TABLE ... ADD COLUMN` guarded for re-runs
+- DECIDED: `/currentUser` is the frontend's single source for role + location; the frontend stores neither on the Better Auth session (see auth-rbac.md)
 
 ## location endpoints
 
@@ -68,3 +79,14 @@ related: [database-layer, auth-rbac, data-repository]
 - WRITES TO: Location and User records (developer overrides)
 - INVARIANT: ADMIN_SECRET must match env var exactly; no hashing
 - DECIDED: admin endpoints exist for local testing; never expose in production
+
+## auth integration with Better Auth
+
+- READS FROM: `X-User-Id` (+ `X-User-Sig-*` HMAC headers) on every request from the Next.js proxy; `get_user_id` currently trusts `X-User-Id`
+- INVARIANT: `POST /auth/login` is still used — but only service-to-service from the PIN plugin (`backendServiceFetch` in `frontend/lib/server-api.ts`), never from the browser
+- INVARIANT: SSO/`/currentUser`/`/currentUser/location` integration endpoints now EXIST (see "auth endpoints" / "currentUser endpoints" above). The frontend calls:
+  - `POST /auth/sso-resolve { email, name? }` → `{ backendUserId, role }` from Better Auth `databaseHooks.user.create.before` (first SSO sign-in)
+  - `GET /currentUser` → role + locations + preferred location, fetched per request by `frontend/lib/server-currentUser.ts`
+  - `PATCH /currentUser/location { locationId }` from the `/select-location` server action
+- DECIDED: **Reverses prior `frontend stores user state in localStorage`.** The session lives in Better Auth's Postgres tables; the backend is the role/location authority, called with a (signed) identity. The frontend stores only `backendUserId`.
+- TODO (still open, security hardening): `get_user_id` does not yet VERIFY the `X-User-Sig` HMAC (payload `${version}.${timestamp}.${userId}`, ±60s skew) with `BACKEND_SHARED_SECRET`. The frontend already sends it; the backend should reject unsigned/invalid requests. Out of scope for the 2026-06 frontend refactor — backend changes were kept minimal (identity model unchanged).

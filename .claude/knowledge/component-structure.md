@@ -10,7 +10,7 @@ related: [frontend-architecture, auth-rbac]
 - OWNS: all React components (UI, layout, business logic)
 - OWNS: subdirectories: admin/, auth/, layout/, providers/, stats/, waste/, ui/
 - INVARIANT: shadcn/UI components live in ui/ (pre-built, customizable)
-- INVARIANT: *-content.tsx components exported for page.tsx use
+- INVARIANT: \*-content.tsx components exported for page.tsx use
 - DECIDED: single-level nesting (no deeply-nested subdirs) to keep navigation simple
 
 ## layout components
@@ -74,7 +74,27 @@ related: [frontend-architecture, auth-rbac]
 ## component patterns
 
 - OWNS: how components receive data, manage state, handle side effects
-- INVARIANT: page.tsx (server) imports *-content.tsx (client)
+- INVARIANT: page.tsx (server) imports \*-content.tsx (client)
 - INVARIANT: 'use client' directive required in client components
 - INVARIANT: data passed as props from server to client (minimal hydration)
 - DECIDED: separate server/client components to avoid hydration mismatches
+
+## auth components (deleted)
+
+- OWNS: there is no `components/auth/` folder — `role-selector.tsx`, `role-guard.tsx`, `superadmin-guard.tsx` are deleted
+- OWNS: there is no `components/providers/` folder — `user-provider.tsx` is deleted
+- DECIDED: **Reverses prior `RoleGuard / RoleSelector` decision.** Authentication UI is `app/login/login-form.tsx` (two-step: Microsoft SSO button + PIN form). Authorisation is server-side in RSCs via `requireRole()` from `lib/server-session.ts`.
+
+## layout components (updated)
+
+- READS FROM: `useCurrentUser()` (which reads the Better Auth session), NOT a context provider
+- INVARIANT: logout in both `app-sidebar.tsx` and `app-header.tsx` calls `authClient.signOut({ fetchOptions: { onSuccess: () => { router.replace("/login"); router.refresh(); } } })` — router.refresh() is required so the new (logged-out) session is picked up by RSCs
+- INVARIANT: role-aware filtering uses `user?.role === "admin" || user?.role === "superadmin"`, NOT `user?.isAdmin` or `user?.isSuperAdmin` (those fields no longer exist)
+- DECIDED: **Reverses prior `setUser/setLocationId` mutation pattern.** Components only read from `useCurrentUser()`; mutations go through `authClient` or server actions.
+
+## hooks
+
+- OWNS: `frontend/hooks/use-current-user.ts` — wraps `authClient.useSession()` and returns `{ user, locationId, isPending }` where `user.id` is the **backend** user id, not the BA uuid
+- OWNS: `hooks/use-reports.ts`, `hooks/use-waste-registrations.ts` — read `{ user, locationId }` from `useCurrentUser()` (not from a context)
+- INVARIANT: hooks are the only client-side bridge to session state; do not call `authClient.useSession()` directly in components
+- DECIDED: keeping the `useCurrentUser` export name minimises diff churn across the existing 9 callers despite the underlying implementation change.

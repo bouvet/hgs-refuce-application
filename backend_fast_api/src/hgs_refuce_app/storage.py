@@ -38,9 +38,17 @@ class DatabaseConnection:
                     is_admin INTEGER NOT NULL DEFAULT 0,
                     is_super_admin INTEGER NOT NULL DEFAULT 0,
                     password TEXT,
+                    preferred_location_id TEXT,
                     created_at TEXT NOT NULL
                 )
             """))
+
+            # Migration: add preferred_location_id to pre-existing users tables.
+            # SQLite lacks ADD COLUMN IF NOT EXISTS, so swallow the duplicate error.
+            try:
+                conn.execute(text("ALTER TABLE users ADD COLUMN preferred_location_id TEXT"))
+            except Exception:
+                pass
 
             # Create locations table
             conn.execute(text("""
@@ -260,6 +268,22 @@ class UserStorage:
                 Location(id=row[0], name=row[1], createdAt=row[2])
                 for row in result.fetchall()
             ]
+
+    def get_preferred_location(self, user_id: str) -> Optional[str]:
+        with self.engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT preferred_location_id FROM users WHERE id = :id
+            """), {"id": user_id})
+            row = result.fetchone()
+            return row[0] if row and row[0] else None
+
+    def set_preferred_location(self, user_id: str, location_id: str) -> None:
+        with self.engine.connect() as conn:
+            conn.execute(text("""
+                UPDATE users SET preferred_location_id = :loc WHERE id = :id
+            """), {"loc": location_id, "id": user_id})
+            conn.commit()
+            logger.debug("set preferred location %s for user %s", location_id, user_id)
 
     def list_users_in_location(self, location_id: str) -> List[str]:
         with self.engine.connect() as conn:

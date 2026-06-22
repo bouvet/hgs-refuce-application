@@ -16,6 +16,10 @@ from .models import (
     WasteRegistration,
     Location,
     User,
+    CurrentUser,
+    SsoResolveRequest,
+    SsoResolveResponse,
+    SetPreferredLocationRequest,
     CreateUserRequest,
     CreateLocationRequest,
     LocationUserEntry,
@@ -125,6 +129,20 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 def _now_iso() -> str:
     from datetime import datetime, timezone
     return datetime.now(timezone.utc).isoformat()
+
+
+def _role_for(user: User) -> str:
+    """Normalize the stored isAdmin/isSuperAdmin flags into a single role.
+
+    superadmin -> isSuperAdmin is True
+    admin      -> isAdmin is True and not isSuperAdmin
+    user       -> otherwise
+    """
+    if user.isSuperAdmin:
+        return "superadmin"
+    if user.isAdmin:
+        return "admin"
+    return "user"
 
 
 def get_user_id(x_user_id: Optional[str] = Header(None)) -> str:
@@ -248,6 +266,49 @@ def login(req: LoginRequest):
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     return user
+
+
+@app.post("/auth/sso-resolve", response_model=SsoResolveResponse)
+def sso_resolve(req: SsoResolveRequest):
+    # Map an Entra email to a backend user. Backend users are provisioned with
+    # their email as the user id; we only confirm the user exists and return
+    # their identity + normalized role. The frontend stores backendUserId only.
+    user = user_storage.get_user(req.email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not provisioned")
+    return SsoResolveResponse(backendUserId=user.id, role=_role_for(user))
+
+
+# ---------- current user ----------
+
+@app.get("/currentUser", response_model=CurrentUser)
+def get_current_user(user_id: str = Depends(get_user_id)):
+    user = user_storage.get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    locations = user_storage.get_user_locations(user_id)
+    preferred = user_storage.get_preferred_location(user_id)
+    # Only surface a preferred location the user still has access to.
+    if preferred and not any(loc.id == preferred for loc in locations):
+        preferred = None
+    return CurrentUser(
+        backendUserId=user.id,
+        role=_role_for(user),
+        locations=locations,
+        preferredLocationId=preferred,
+    )
+
+
+@app.patch("/currentUser/location", status_code=204, response_class=Response)
+def set_my_location(
+    req: SetPreferredLocationRequest,
+    user_id: str = Depends(get_user_id),
+):
+    locations = user_storage.get_user_locations(user_id)
+    if not any(loc.id == req.locationId for loc in locations):
+        raise HTTPException(status_code=403, detail="No access to this location")
+    user_storage.set_preferred_location(user_id, req.locationId)
+    return Response(status_code=204)
 
 
 # ---------- user endpoints ----------

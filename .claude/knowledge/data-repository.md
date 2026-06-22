@@ -49,3 +49,14 @@ related: [backend-api, frontend-architecture]
 - READS FROM: HTTP status codes from backend
 - INVARIANT: errors logged to console but not user-facing (check components for toast/alert handling)
 - TENSION: no centralized error boundary for API errors; each component handles locally
+
+## identity model (updated)
+
+- OWNS: identity injection happens server-side in `frontend/app/api/[...path]/route.ts` via `userIdentityHeaders(session.user.backendUserId)`
+- READS FROM: Better Auth session (via `getServerSession()`)
+- WRITES TO: outbound HMAC-signed headers `X-User-Id`, `X-User-Sig-Version`, `X-User-Sig-Timestamp`, `X-User-Sig`
+- INVARIANT: **`BackendWasteRepository` no longer takes a `userId` constructor arg** and does not set any `X-User-Id` header. The proxy is the sole authority on identity.
+- INVARIANT: **`createWasteRepository(locationId)` takes ONE argument**, not `(locationId, userId)`. All 11 call sites updated.
+- INVARIANT: **`lib/api.ts` no longer accepts `userId` arguments** on any method. The old `api.login()` is also gone (sign-in is `authClient.signIn.{social, pin}` instead).
+- INVARIANT: the route handler strips any client-sent identity headers (`BLOCKED_REQUEST_HEADERS` set) before forwarding, preventing impersonation.
+- DECIDED: **Reverses prior `auth state available in UserProvider`.** Repositories are now stateless w.r.t. identity — the proxy handles it. This eliminates a whole class of bugs where the wrong userId was passed.

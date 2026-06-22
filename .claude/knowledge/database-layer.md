@@ -58,3 +58,15 @@ related: [backend-api, auth-rbac]
 - READS FROM: models.py schema definitions
 - INVARIANT: test db reset via `Base.metadata.drop_all()` + `create_all()` in setup_function()
 - DECIDED: no query logging or tracing; add debug output to main.py if needed
+
+## Better Auth tables (Postgres, frontend-owned)
+
+- OWNS: a separate Postgres database (or schema) accessed by Next.js via the `pg` driver — NOT the FastAPI backend
+- OWNS: tables `user`, `session`, `account`, `verification` created by `npx @better-auth/cli@latest migrate`
+- OWNS: additional columns on `"user"` set via `additionalFields`: `backendUserId` (unique, `input: false` so clients can't supply it), `role`, `preferredLocationId`, `currentLocationId`
+- READS FROM: `DATABASE_URL` env var (the Next.js one, not the FastAPI one — they can point at the same Postgres but conventionally use separate databases)
+- WRITES TO: Better Auth manages all schema writes via the CLI; never modify these tables by hand
+- INVARIANT: pg pool is a singleton via `globalThis.__betterAuthPgPool` to survive dev hot reloads
+- INVARIANT: the FastAPI `User` table is NOT replaced — it still owns email/password/role on the backend side. Better Auth's `user.backendUserId` is the foreign key linking the two.
+- TENSION: two source-of-truth tables for users. Acceptable trade-off: backend keeps password/role for its own auth needs, Better Auth keeps email/session/oauth account links. Reconciled on every sign-in via `databaseHooks` (SSO) or the PIN plugin (credentials).
+- DECIDED: separate Postgres for Better Auth keeps the migration low-risk — the FastAPI schema does not need to change at all to add SSO.
