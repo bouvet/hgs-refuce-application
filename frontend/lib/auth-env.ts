@@ -30,13 +30,10 @@ export const authEnv = {
     return required("BETTER_AUTH_SECRET");
   },
   get databaseURL(): string {
-    return required("DATABASE_URL");
+    return required("AUTH_DATABASE_URL");
   },
   get backendURL(): string {
-    return optional(
-      "BACKEND_API_URL",
-      optional("NEXT_PUBLIC_API_URL", "http://localhost:8000"),
-    );
+    return optional("BACKEND_API_URL", "http://localhost:8000");
   },
   get backendSharedSecret(): string {
     return required("BACKEND_SHARED_SECRET");

@@ -1,4 +1,21 @@
 services:
+  # Postgres for Better Auth (user/session/account/verification tables).
+  # Intentionally separate from the FastAPI backend database — they are
+  # independent stores and must never share a connection pool.
+  postgres_ba:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: refuce_auth
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev
+    volumes:
+      - postgres_ba_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d refuce_auth"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend_fast_api
@@ -28,10 +45,24 @@ services:
     ports:
       - "3000:3000"
     environment:
+      # Better Auth
+      BETTER_AUTH_URL: http://localhost:3000
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      # Better Auth's own DB — separate from backend
+      AUTH_DATABASE_URL: postgresql://postgres:dev@postgres_ba:5432/refuce_auth
+      # Backend integration
       BACKEND_API_URL: http://backend:8000
+      BACKEND_SHARED_SECRET: ${BACKEND_SHARED_SECRET}
+      # Microsoft Entra ID SSO
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET}
+      MICROSOFT_TENANT_ID: ${MICROSOFT_TENANT_ID}
     depends_on:
       backend:
+        condition: service_healthy
+      postgres_ba:
         condition: service_healthy
 
 volumes:
   backend_data:
+  postgres_ba_data:

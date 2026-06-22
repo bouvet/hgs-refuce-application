@@ -14,10 +14,7 @@ import { userIdentityHeaders } from "@/lib/server-api";
  * handler at `app/api/auth/[...all]/route.ts` — Next.js dispatches the more
  * specific dynamic segment first, so this catch-all never sees those paths.
  */
-const BACKEND_URL =
-  process.env.BACKEND_API_URL ??
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://localhost:8000";
+const BACKEND_URL = process.env.BACKEND_API_URL ?? "http://localhost:8000";
 
 const BLOCKED_REQUEST_HEADERS = new Set([
   "host",

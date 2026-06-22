@@ -80,7 +80,7 @@ related: [auth-rbac, data-repository, component-structure]
 
 ## environment variables (updated)
 
-- OWNS: `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `DATABASE_URL` (Postgres for Better Auth), `BACKEND_API_URL`, `BACKEND_SHARED_SECRET`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID`
+- OWNS: `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `AUTH_DATABASE_URL` (Postgres for Better Auth — deliberately separate from FastAPI's `DATABASE_URL`), `BACKEND_API_URL`, `BACKEND_SHARED_SECRET`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID`
 - INVARIANT: server-side secrets (no `NEXT_PUBLIC_` prefix); accessed via `lib/auth-env.ts` helpers `required()` / `optional()` which throw lazily on missing required vars
 - INVARIANT: `NEXT_PUBLIC_API_URL` is gone — the browser only ever calls `/api/*`; the backend URL is server-side only
 - DECIDED: **Reverses prior `NEXT_PUBLIC_API_URL` decision.** Exposing the backend URL to the browser is unnecessary now that the proxy handles every backend call; removing it lets us add HMAC headers without leaking the secret.
