@@ -34,6 +34,20 @@ Follow the Next.js App Router default: **components are server components unless
 - A server component CAN import and render client components — the client component runs on the client, while the static content around it is server-rendered.
 - If a page needs interactivity, extract the interactive part into a separate client component in `components/` and import it from the server component page.
 
+## Authentication (Better Auth)
+
+Auth uses **Better Auth 1.6** with its own Postgres tables. The configuration lives in `lib/auth.ts`; do not bypass it.
+
+- **Server-side guards** (in RSCs, server actions, route handlers): `getServerSession()`, `requireSession(redirectTo?)`, `requireRole(role | Role[])` from `lib/server-session.ts`. These are the **only** authorisation boundary — client checks are for rendering, not security.
+- **Client-side reads**: `useCurrentUser()` from `hooks/use-current-user.ts` returns `{ user, locationId, isPending }`. `user.id` is the **backend** user id (the FastAPI primary key), NOT the Better Auth uuid — components rely on this for `createdBy` and any admin API calls.
+- **Sign-in** is `authClient.signIn.social({ provider: "microsoft", callbackURL })` or `authClient.signIn.pin({ username, pin })` from `lib/auth-client.ts`. Sign-out: `authClient.signOut({ fetchOptions: { onSuccess: () => { router.replace("/login"); router.refresh(); } } })` — `router.refresh()` is required so RSCs see the new (logged-out) session.
+- **`proxy.ts`** (Next.js 16 — NOT `middleware.ts`) is **optimistic only**: it checks cookie presence via `getSessionCookie(request, { cookiePrefix: "avfall" })` and redirects to `/login` if absent. Real validation happens in `app/api/[...path]/route.ts` (which mints the HMAC identity header) and in server components via the helpers above.
+- **Roles**: `"user" | "admin" | "superadmin"` — string literals, no `isAdmin`/`isSuperAdmin` booleans.
+- **No client-side state mutation**: there is no `setUser`/`setLocationId`/`UserProvider`. Mutations go through Better Auth APIs (`authClient.signIn/signOut`) or server actions (e.g. `setCurrentLocation` in `app/select-location/actions.ts`).
+- **`lib/api.ts` and `createWasteRepository(locationId)` take no `userId` argument.** Identity is server-injected by the proxy. Adding a `userId` parameter back would be a regression.
+
+When adding a new authenticated page or endpoint, read `.claude/knowledge/auth-rbac.md` first — the model was rewritten in 2026-06 and many `DECIDED` entries explicitly reverse pre-Better-Auth patterns.
+
 ## Tailwind CSS v4
 
 v4 is a major rewrite — do not apply v3 patterns.
@@ -59,7 +73,7 @@ v4 is a major rewrite — do not apply v3 patterns.
 
 ## useEffect — only when necessary
 
-Before writing a `useEffect`, ask: *why does this code need to run?*
+Before writing a `useEffect`, ask: _why does this code need to run?_
 
 - **"Because the user did something"** → use an event handler, not an Effect.
 - **"Because of other state/props"** → compute during render (or `useMemo`), not an Effect.
@@ -102,15 +116,16 @@ Calling `setState` synchronously inside an Effect body causes cascading renders.
 
 React 19 removes and replaces several patterns. Do not use the old ones.
 
-| Old | New |
-|-----|-----|
-| `forwardRef(fn)` | `ref` is a plain prop — just destructure it |
-| `<Context.Provider value={...}>` | `<Context value={...}>` |
-| `useFormState` (react-dom) | `useActionState(action, initialState)` |
-| `ReactDOM.render` | `createRoot(el).render(...)` |
-| `propTypes` / `defaultProps` on function components | TypeScript types + default parameters |
+| Old                                                 | New                                         |
+| --------------------------------------------------- | ------------------------------------------- |
+| `forwardRef(fn)`                                    | `ref` is a plain prop — just destructure it |
+| `<Context.Provider value={...}>`                    | `<Context value={...}>`                     |
+| `useFormState` (react-dom)                          | `useActionState(action, initialState)`      |
+| `ReactDOM.render`                                   | `createRoot(el).render(...)`                |
+| `propTypes` / `defaultProps` on function components | TypeScript types + default parameters       |
 
 **New hooks:**
+
 - `use(promise)` / `use(Context)` — read async resources or context in render
 - `useActionState(action, initialState)` — manage form action state
 - `useFormStatus()` — inside a `<form>`, reads pending/data/method
@@ -123,30 +138,35 @@ React 19 removes and replaces several patterns. Do not use the old ones.
 These are commonly misused — check `node_modules/next/dist/docs/` for the full reference.
 
 ### Async Request APIs (breaking)
+
 `cookies()`, `headers()`, `draftMode()`, `params`, and `searchParams` are now **async only** — synchronous access was removed. Always `await` them:
 
 ```tsx
-export default async function Page(props: PageProps<'/blog/[slug]'>) {
-  const { slug } = await props.params
-  const query = await props.searchParams
+export default async function Page(props: PageProps<"/blog/[slug]">) {
+  const { slug } = await props.params;
+  const query = await props.searchParams;
 }
 ```
 
 Run `npx next typegen` to generate `PageProps`, `LayoutProps`, and `RouteContext` helpers.
 
 ### `middleware` renamed to `proxy`
+
 The `middleware.ts` file and its named export are deprecated. Use `proxy.ts` with a `proxy` export instead. The `edge` runtime is **not** supported in `proxy` (use `nodejs`). Config flag `skipMiddlewareUrlNormalize` → `skipProxyUrlNormalize`.
 
 ### Caching APIs
+
 - `revalidateTag` now requires a second `cacheLife` profile argument: `revalidateTag('posts', 'max')`
 - `cacheLife` and `cacheTag` are stable — drop the `unstable_` prefix
 - New: `updateTag` (Server Actions only) for read-your-writes semantics
 - New: `refresh()` from `next/cache` to refresh the client router from a Server Action
 
 ### Partial Prerendering
+
 PPR is now opt-in via `cacheComponents: true` in `next.config.ts` (replaces the `experimental.ppr` flag).
 
 ### `next/image` defaults changed
+
 - `minimumCacheTTL`: `60s` → `14400s` (4 hours)
 - `imageSizes`: `16` removed from default array
 - `qualities`: now defaults to `[75]` only

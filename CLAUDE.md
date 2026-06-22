@@ -15,13 +15,14 @@ Each sub-project has its own `CLAUDE.md` with detailed guidance. Read those befo
 
 Three scripts at the repo root start the backend and frontend together. All require a `.venv` in `backend_fast_api/` — if it's missing they will print setup instructions and exit.
 
-| Script | Platform |
-|--------|----------|
-| `start.bat` | Windows (cmd) |
+| Script      | Platform             |
+| ----------- | -------------------- |
+| `start.bat` | Windows (cmd)        |
 | `start.ps1` | Windows (PowerShell) |
-| `start.sh` | bash / WSL |
+| `start.sh`  | bash / WSL           |
 
 One-time setup before first run:
+
 ```bash
 python -m venv backend_fast_api/.venv
 # Windows:
@@ -59,7 +60,7 @@ npm run lint    # ESLint
 user → frontend → backend → SQLite (dev) / PostgreSQL (prod)
 ```
 
-The backend is the authority on data shape. The frontend calls the backend for all waste registration and report data via `lib/data/backend-waste-repository.ts`. The only remaining `localStorage` use is role/user selection (`boss-app:current-user` in `UserProvider`).
+The backend is the authority on data shape and on roles/location membership. The frontend calls the backend for all waste registration and report data via `lib/data/backend-waste-repository.ts`. **Authentication and sessions** live in **Better Auth** inside Next.js (Postgres-backed) — either Microsoft Entra ID SSO or a username/PIN form that delegates credential verification to FastAPI. The Next.js proxy at `/api/[...path]` injects an HMAC-signed identity header on every backend call; the backend never trusts client-supplied identity.
 
 ### Backend
 
@@ -79,9 +80,13 @@ Tests use FastAPI's `TestClient` against the live app instance and clear the DB 
 
 ### Frontend
 
-- **Auth**: Role-based (`common` | `admin`). The landing page (`app/page.tsx`) shows a `RoleSelector`; the chosen role is persisted in `localStorage` via `UserProvider` (`components/providers/user-provider.tsx`). `RoleGuard` redirects users who lack the required role.
-- **Routing**: All authenticated pages live under `app/(app)/` (oversikt, statistikk, historikk, registrer, registreringer, rapportering). Admin-only pages use `RoleGuard`.
-- **Data layer**: `lib/data/waste-repository.ts` exports the `WasteRepository` interface and a `wasteRepository` singleton backed by `BackendWasteRepository` (`lib/data/backend-waste-repository.ts`). All reads/writes go through this singleton. The backend URL defaults to `http://localhost:8000` and can be overridden via `NEXT_PUBLIC_API_URL` in `frontend/.env.local`. Periods are tracked as `YYYY-Qn` quarter strings; a submitted report locks its quarter.
+- **Auth**: **Better Auth 1.6** (`frontend/lib/auth.ts`) in Next.js with its own Postgres tables. Two sign-in paths:
+  - **Microsoft SSO** via the built-in `microsoft` social provider (Entra ID); on first sign-in, a `databaseHooks.user.create.before` hook calls `POST /auth/sso-resolve` on FastAPI to mirror role + preferred location onto the BA user.
+  - **Username + PIN** via a custom plugin (`lib/auth-plugins/pin-credentials.ts`) that proxies credentials to FastAPI `POST /auth/login` and creates a BA session on success.
+  - Three roles: `user` | `admin` | `superadmin`. Server-side authorisation via `requireSession()` / `requireRole()` in `lib/server-session.ts`. No client-side guards.
+  - The `/api/[...path]` proxy and `proxy.ts` (Next 16 name for middleware) enforce the session; `proxy.ts` is **optimistic only** — real checks happen in the route handler and RSCs.
+- **Routing**: All authenticated pages live under `app/(app)/` (oversikt, statistikk, historikk, registrer, registreringer, rapportering). `app/(app)/layout.tsx` calls `requireSession()`; superadmin pages call `requireRole("superadmin")`.
+- **Data layer**: `lib/data/waste-repository.ts` exports the `WasteRepository` interface and a `createWasteRepository(locationId)` factory backed by `BackendWasteRepository` (`lib/data/backend-waste-repository.ts`). The browser only ever calls `/api/*`; the backend URL is server-side (`BACKEND_API_URL`, no `NEXT_PUBLIC_` prefix). Periods are tracked as `YYYY-Qn` quarter strings; a submitted report locks its quarter.
 - **Pages → Components pattern**: `page.tsx` files are server components that import a single `*-content.tsx` client component for interactivity.
 - **Styling**: Tailwind CSS v4 — config is in `app/globals.css`, not a config file. Uses oklch colors.
 - **UI components**: shadcn/UI `base-vega` style (uses `@base-ui/react`, not Radix UI). Add with `npx shadcn@latest add <name>`.
@@ -90,14 +95,15 @@ Tests use FastAPI's `TestClient` against the live app instance and clear the DB 
 
 This repository maintains a structured, externalized mental model across sessions. The system has **four tiers**:
 
-| Tier | Location | Purpose |
-|------|----------|---------|
-| 1 | `CLAUDE.md` (this file) | Project overview, navigation hub, constraints |
-| 2 | `.claude/instructions/` | Conventions/rules per file type — **how to work** |
-| 3 | `.claude/knowledge/` | Living mental model — **how it works & why** |
-| 4 | `.claude/skills/` | Multi-step workflows — **how to do X** |
+| Tier | Location                | Purpose                                           |
+| ---- | ----------------------- | ------------------------------------------------- |
+| 1    | `CLAUDE.md` (this file) | Project overview, navigation hub, constraints     |
+| 2    | `.claude/instructions/` | Conventions/rules per file type — **how to work** |
+| 3    | `.claude/knowledge/`    | Living mental model — **how it works & why**      |
+| 4    | `.claude/skills/`       | Multi-step workflows — **how to do X**            |
 
 **Knowledge files by domain:**
+
 - **backend-api.md** — FastAPI routes, endpoints, request handling
 - **database-layer.md** — SQLAlchemy, models, storage, schema
 - **frontend-architecture.md** — Next.js routing, layouts, pages, environment
@@ -118,5 +124,5 @@ This repository maintains a structured, externalized mental model across session
 
 ## Planned / not yet implemented
 
-- Authentication and authorization (admin vs. regular user, currently client-side only)
+- Backend endpoints required by the new auth model: `POST /auth/sso-resolve` (called by Better Auth's user-create hook to map Entra users to backend roles/locations) and `PATCH /users/{id}/preferred-location` (called by the `/select-location` server action). Both must verify the HMAC `X-User-Sig` header using `BACKEND_SHARED_SECRET`. See `.claude/knowledge/backend-api.md`.
 - Pluggable data ingestion adapter/parser layer on the backend

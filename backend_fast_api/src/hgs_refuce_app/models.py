@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 
 
 class WasteCategoryEntry(BaseModel):
@@ -38,6 +38,32 @@ class User(BaseModel):
     id: str
     isAdmin: bool
     isSuperAdmin: bool = False
+
+
+class CurrentUser(BaseModel):
+    """The signed-in user's authoritative role + location, served from /currentUser.
+
+    The backend is the source of truth for both; the frontend never stores
+    these on the Better Auth session.
+    """
+    backendUserId: str
+    role: str = Field(..., description="user | admin | superadmin")
+    locations: List[Location]
+    preferredLocationId: Optional[str] = None
+
+
+class SsoResolveRequest(BaseModel):
+    email: str
+    name: Optional[str] = None
+
+
+class SsoResolveResponse(BaseModel):
+    backendUserId: str
+    role: str
+
+
+class SetPreferredLocationRequest(BaseModel):
+    locationId: str
 
 
 class LocationUserEntry(BaseModel):
