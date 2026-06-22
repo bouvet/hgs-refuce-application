@@ -1,10 +1,7 @@
-import { SuperAdminGuard } from "@/components/auth/superadmin-guard";
 import { SuperAdminContent } from "@/components/admin/superadmin-content";
+import { requireRole } from "@/lib/server-session";
 
-export default function SuperAdminPage() {
-  return (
-    <SuperAdminGuard>
-      <SuperAdminContent />
-    </SuperAdminGuard>
-  );
+export default async function SuperAdminPage() {
+  await requireRole("superadmin");
+  return <SuperAdminContent />;
 }

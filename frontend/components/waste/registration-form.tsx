@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useContext } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import { nb } from "date-fns/locale";
@@ -20,7 +20,6 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { useReports } from "@/hooks/use-reports";
 import { dateToQuarter, quarterLabel } from "@/lib/quarters";
 import type { WasteRegistration } from "@/lib/types";
-import { UserContext } from "@/lib/user-context";
 
 function generateId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -47,8 +46,7 @@ function prevDateOf(ds: string): string {
 }
 
 export function RegistrationForm() {
-  const { user } = useCurrentUser();
-  const { locationId } = useContext(UserContext);
+  const { user, locationId } = useCurrentUser();
   const { isPeriodLocked } = useReports();
   const searchParams = useSearchParams();
   const datoParam = searchParams.get("dato");
@@ -70,12 +68,9 @@ export function RegistrationForm() {
     let cancelled = false;
     (async () => {
       if (!user?.id || !locationId) return;
-      const repo = createWasteRepository(locationId, user.id);
+      const repo = createWasteRepository(locationId);
       const prevDs = prevDateOf(dateStr);
-      const regs = await repo.getRegistrationsByDateRange(
-        prevDs,
-        dateStr,
-      );
+      const regs = await repo.getRegistrationsByDateRange(prevDs, dateStr);
       if (cancelled) return;
       const current = regs.find((r) => r.date === dateStr) ?? null;
       const prev = regs.find((r) => r.date === prevDs) ?? null;
@@ -139,10 +134,12 @@ export function RegistrationForm() {
       createdBy: user.id,
     };
     try {
-      const repo = createWasteRepository(locationId, user.id);
+      const repo = createWasteRepository(locationId);
       await repo.saveRegistration(reg);
       setExistingId(reg.id);
-      toast.success(wasUpdate ? "Registrering oppdatert" : "Registrering lagret");
+      toast.success(
+        wasUpdate ? "Registrering oppdatert" : "Registrering lagret",
+      );
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Kunne ikke lagre registrering",

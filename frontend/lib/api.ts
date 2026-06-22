@@ -1,6 +1,15 @@
-import type { User, AdminUser, Location } from "@/lib/types";
+import type { AdminUser, Location } from "@/lib/types";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8010";
+/**
+ * Browser-side API client. All requests go through the Next.js proxy at
+ * `/api/[...path]`, which injects the user identity from the Better Auth
+ * session — no auth headers are set here.
+ *
+ * No `userId` parameter is accepted: the proxy is the sole authority on
+ * who the request belongs to. This prevents impersonation from the
+ * client.
+ */
+const apiBaseUrl = "/api";
 
 class ApiError extends Error {
   constructor(
@@ -15,9 +24,11 @@ class ApiError extends Error {
 async function request<T>(
   path: string,
   init?: RequestInit & { params?: Record<string, string | undefined> },
-  userId?: string,
 ): Promise<T> {
-  const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+  const origin =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "http://localhost:3000";
   const url = new URL(apiBaseUrl + path, origin);
   if (init?.params) {
     for (const [k, v] of Object.entries(init.params)) {
@@ -25,13 +36,11 @@ async function request<T>(
     }
   }
 
-  const { params: _, ...rest } = init ?? {};
+  const rest: RequestInit = { ...(init ?? {}) };
+  delete (rest as { params?: unknown }).params;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (userId) {
-    headers["X-User-Id"] = userId;
-  }
 
   const resp = await fetch(url.toString(), {
     headers,
@@ -54,89 +63,66 @@ async function request<T>(
 }
 
 export const api = {
-  login: async (username: string, password: string): Promise<AdminUser> => {
-    return request<AdminUser>("/auth/login", {
+  getMyLocations: async (): Promise<Location[]> => {
+    return request<Location[]>("/locations");
+  },
+
+  createLocation: async (name: string): Promise<Location> => {
+    return request<Location>("/locations", {
       method: "POST",
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ name }),
     });
   },
 
-  getMyLocations: async (userId: string): Promise<Location[]> => {
-    return request<Location[]>("/locations", {}, userId);
+  deleteLocation: async (locationId: string): Promise<void> => {
+    await request<void>(`/locations/${encodeURIComponent(locationId)}`, {
+      method: "DELETE",
+    });
   },
 
-  createLocation: async (userId: string, name: string): Promise<Location> => {
-    return request<Location>(
-      "/locations",
-      { method: "POST", body: JSON.stringify({ name }) },
-      userId,
-    );
-  },
-
-  deleteLocation: async (userId: string, locationId: string): Promise<void> => {
-    await request<void>(
-      `/locations/${encodeURIComponent(locationId)}`,
-      { method: "DELETE" },
-      userId,
-    );
-  },
-
-  listAllUsers: async (userId: string): Promise<AdminUser[]> => {
-    return request<AdminUser[]>("/users", {}, userId);
+  listAllUsers: async (): Promise<AdminUser[]> => {
+    return request<AdminUser[]>("/users");
   },
 
   createUser: async (
-    userId: string,
     username: string,
     isAdmin: boolean,
-  ): Promise<User> => {
-    return request<User>(
-      "/users",
-      {
-        method: "POST",
-        body: JSON.stringify({ id: username, isAdmin }),
-      },
-      userId,
-    );
+  ): Promise<AdminUser> => {
+    return request<AdminUser>("/users", {
+      method: "POST",
+      body: JSON.stringify({ id: username, isAdmin }),
+    });
   },
 
-  deleteUser: async (userId: string, targetUserId: string): Promise<void> => {
-    await request<void>(
-      `/users/${encodeURIComponent(targetUserId)}`,
-      { method: "DELETE" },
-      userId,
-    );
+  deleteUser: async (targetUserId: string): Promise<void> => {
+    await request<void>(`/users/${encodeURIComponent(targetUserId)}`, {
+      method: "DELETE",
+    });
   },
 
   addUserToLocation: async (
-    userId: string,
     locationId: string,
     targetUserId: string,
   ): Promise<void> => {
     await request<void>(
       `/locations/${encodeURIComponent(locationId)}/users/${encodeURIComponent(targetUserId)}`,
       { method: "POST" },
-      userId,
     );
   },
 
   removeUserFromLocation: async (
-    userId: string,
     locationId: string,
     targetUserId: string,
   ): Promise<void> => {
     await request<void>(
       `/locations/${encodeURIComponent(locationId)}/users/${encodeURIComponent(targetUserId)}`,
       { method: "DELETE" },
-      userId,
     );
   },
 
-  listLocationUsers: async (userId: string, locationId: string): Promise<string[]> => {
+  listLocationUsers: async (locationId: string): Promise<string[]> => {
     return request<string[]>(
       `/locations/${encodeURIComponent(locationId)}/users`,
-      {},
-      userId,
     );
   },
 };

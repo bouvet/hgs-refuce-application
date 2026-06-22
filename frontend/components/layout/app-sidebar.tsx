@@ -15,11 +15,30 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { signOut } from "@/lib/auth-client";
 
 const allLinks = [
-  { href: "/oversikt", label: "Oversikt", icon: Home, adminOnly: true, superAdminOnly: false },
-  { href: "/registrer", label: "Registrer", icon: Plus, adminOnly: false, superAdminOnly: false },
-  { href: "/rapportering", label: "Rapportering", icon: Send, adminOnly: true, superAdminOnly: false },
+  {
+    href: "/oversikt",
+    label: "Oversikt",
+    icon: Home,
+    adminOnly: true,
+    superAdminOnly: false,
+  },
+  {
+    href: "/registrer",
+    label: "Registrer",
+    icon: Plus,
+    adminOnly: false,
+    superAdminOnly: false,
+  },
+  {
+    href: "/rapportering",
+    label: "Rapportering",
+    icon: Send,
+    adminOnly: true,
+    superAdminOnly: false,
+  },
   {
     href: "/registreringer",
     label: "Registreringer",
@@ -34,16 +53,28 @@ const allLinks = [
     adminOnly: true,
     superAdminOnly: false,
   },
-  { href: "/historikk", label: "Historikk", icon: History, adminOnly: false, superAdminOnly: false },
-  { href: "/sadmin", label: "Administrasjon", icon: Settings, adminOnly: false, superAdminOnly: true },
+  {
+    href: "/historikk",
+    label: "Historikk",
+    icon: History,
+    adminOnly: false,
+    superAdminOnly: false,
+  },
+  {
+    href: "/sadmin",
+    label: "Administrasjon",
+    icon: Settings,
+    adminOnly: false,
+    superAdminOnly: true,
+  },
 ];
 
 export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, setUser, setLocationId } = useCurrentUser();
-  const isAdmin = user?.role === "admin";
-  const isSuperAdmin = user?.isSuperAdmin;
+  const { user } = useCurrentUser();
+  const isAdmin = user?.role === "admin" || user?.role === "superadmin";
+  const isSuperAdmin = user?.role === "superadmin";
 
   const links = allLinks.filter((l) => {
     if (l.superAdminOnly) return isSuperAdmin;
@@ -51,10 +82,15 @@ export function AppSidebar() {
     return true;
   });
 
-  function handleLogout() {
-    setUser(null);
-    setLocationId(null);
-    router.push("/");
+  async function handleLogout() {
+    await signOut({
+      fetchOptions: {
+        onSuccess: () => {
+          router.replace("/login");
+          router.refresh();
+        },
+      },
+    });
   }
 
   return (

@@ -32,11 +32,16 @@ export class BackendWasteRepository implements WasteRepository {
   constructor(
     private readonly baseUrl: string,
     private readonly locationId: string,
-    private readonly userId: string,
   ) {}
 
-  private url(path: string, params?: Record<string, string | undefined>): string {
-    const base = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+  private url(
+    path: string,
+    params?: Record<string, string | undefined>,
+  ): string {
+    const base =
+      typeof window !== "undefined"
+        ? window.location.origin
+        : "http://localhost:3000";
     const u = new URL(this.baseUrl + path, base);
     if (params) {
       for (const [k, v] of Object.entries(params)) {
@@ -54,7 +59,6 @@ export class BackendWasteRepository implements WasteRepository {
     const resp = await fetch(this.url(path, params), {
       headers: {
         "Content-Type": "application/json",
-        "X-User-Id": this.userId,
       },
       ...rest,
     });
@@ -62,28 +66,39 @@ export class BackendWasteRepository implements WasteRepository {
   }
 
   async getRegistrations(): Promise<WasteRegistration[]> {
-    return this.request<WasteRegistration[]>(`/locations/${encodeURIComponent(this.locationId)}/registrations`);
+    return this.request<WasteRegistration[]>(
+      `/locations/${encodeURIComponent(this.locationId)}/registrations`,
+    );
   }
 
   async getRegistrationByDate(date: string): Promise<WasteRegistration | null> {
-    const list = await this.request<WasteRegistration[]>(`/locations/${encodeURIComponent(this.locationId)}/registrations`, {
-      params: { date },
-    });
+    const list = await this.request<WasteRegistration[]>(
+      `/locations/${encodeURIComponent(this.locationId)}/registrations`,
+      {
+        params: { date },
+      },
+    );
     return list[0] ?? null;
   }
 
   async saveRegistration(reg: WasteRegistration): Promise<void> {
     try {
-      await this.request<WasteRegistration>(`/locations/${encodeURIComponent(this.locationId)}/registrations/${encodeURIComponent(reg.id)}`, {
-        method: "PUT",
-        body: JSON.stringify(reg),
-      });
+      await this.request<WasteRegistration>(
+        `/locations/${encodeURIComponent(this.locationId)}/registrations/${encodeURIComponent(reg.id)}`,
+        {
+          method: "PUT",
+          body: JSON.stringify(reg),
+        },
+      );
     } catch (err) {
       if (err instanceof HttpError && err.status === 404) {
-        await this.request<WasteRegistration>(`/locations/${encodeURIComponent(this.locationId)}/registrations`, {
-          method: "POST",
-          body: JSON.stringify(reg),
-        });
+        await this.request<WasteRegistration>(
+          `/locations/${encodeURIComponent(this.locationId)}/registrations`,
+          {
+            method: "POST",
+            body: JSON.stringify(reg),
+          },
+        );
         return;
       }
       throw err;
@@ -91,25 +106,34 @@ export class BackendWasteRepository implements WasteRepository {
   }
 
   async deleteRegistration(id: string): Promise<void> {
-    await this.request<null>(`/locations/${encodeURIComponent(this.locationId)}/registrations/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-    });
+    await this.request<null>(
+      `/locations/${encodeURIComponent(this.locationId)}/registrations/${encodeURIComponent(id)}`,
+      {
+        method: "DELETE",
+      },
+    );
   }
 
   async getRegistrationsByDateRange(
     from: string,
     to: string,
   ): Promise<WasteRegistration[]> {
-    return this.request<WasteRegistration[]>(`/locations/${encodeURIComponent(this.locationId)}/registrations`, {
-      params: { from, to },
-    });
+    return this.request<WasteRegistration[]>(
+      `/locations/${encodeURIComponent(this.locationId)}/registrations`,
+      {
+        params: { from, to },
+      },
+    );
   }
 
   async getRegistrationsInPeriod(period: string): Promise<WasteRegistration[]> {
     if (period.includes("Q")) {
-      return this.request<WasteRegistration[]>(`/locations/${encodeURIComponent(this.locationId)}/registrations`, {
-        params: { period },
-      });
+      return this.request<WasteRegistration[]>(
+        `/locations/${encodeURIComponent(this.locationId)}/registrations`,
+        {
+          params: { period },
+        },
+      );
     }
     // YYYY-MM → first/last day of that month
     const [y, m] = period.split("-").map(Number);
@@ -120,7 +144,9 @@ export class BackendWasteRepository implements WasteRepository {
   }
 
   async getReports(): Promise<Report[]> {
-    return this.request<Report[]>(`/locations/${encodeURIComponent(this.locationId)}/reports`);
+    return this.request<Report[]>(
+      `/locations/${encodeURIComponent(this.locationId)}/reports`,
+    );
   }
 
   async getReportForPeriod(period: string): Promise<Report | null> {
@@ -135,16 +161,22 @@ export class BackendWasteRepository implements WasteRepository {
   }
 
   async submitReport(period: string, submittedBy: string): Promise<Report> {
-    return this.request<Report>(`/locations/${encodeURIComponent(this.locationId)}/reports`, {
-      method: "POST",
-      body: JSON.stringify({ period, submittedBy }),
-    });
+    return this.request<Report>(
+      `/locations/${encodeURIComponent(this.locationId)}/reports`,
+      {
+        method: "POST",
+        body: JSON.stringify({ period, submittedBy }),
+      },
+    );
   }
 
   async unlockReport(period: string): Promise<void> {
-    await this.request<null>(`/locations/${encodeURIComponent(this.locationId)}/reports/${encodeURIComponent(period)}`, {
-      method: "DELETE",
-    });
+    await this.request<null>(
+      `/locations/${encodeURIComponent(this.locationId)}/reports/${encodeURIComponent(period)}`,
+      {
+        method: "DELETE",
+      },
+    );
   }
 
   async isPeriodLocked(periodOrDate: string): Promise<boolean> {

@@ -3,34 +3,13 @@
 import { useState, useMemo } from "react";
 import { useWasteRegistrations } from "@/hooks/use-waste-registrations";
 import { DEFAULT_WASTE_CATEGORIES } from "@/lib/data/waste-categories";
-import {
-  dateToQuarter,
-  quarterStartDate,
-  quarterEndDate,
-} from "@/lib/quarters";
-import type { WasteRegistration } from "@/lib/types";
+import { dateToQuarter } from "@/lib/quarters";
 import { cn } from "@/lib/utils";
+import { regsInQuarter, catVal } from "@/lib/waste-utils";
 
 type Period = "week" | "month" | "year";
 
 const DAY_LABELS = ["søn", "man", "tir", "ons", "tor", "fre", "lør"];
-
-function regsInQuarter(
-  regs: WasteRegistration[],
-  quarter: string,
-): WasteRegistration[] {
-  const start = quarterStartDate(quarter);
-  const end = quarterEndDate(quarter);
-  return regs.filter((r) => r.date >= start && r.date <= end);
-}
-
-function catVal(regs: WasteRegistration[], catId: string): number {
-  return regs.reduce(
-    (s, r) =>
-      s + (r.entries.find((e) => e.categoryId === catId)?.weightKg ?? 0),
-    0,
-  );
-}
 
 export function StatisticsContent() {
   const { registrations } = useWasteRegistrations();

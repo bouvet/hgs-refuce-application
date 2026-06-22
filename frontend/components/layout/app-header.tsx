@@ -14,6 +14,7 @@ import {
   History,
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { signOut } from "@/lib/auth-client";
 import { Badge } from "@/components/ui/badge";
 import {
   Sheet,
@@ -45,14 +46,19 @@ const allLinks = [
 export function AppHeader() {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, setUser, setLocationId } = useCurrentUser();
-  const isAdmin = user?.role === "admin";
+  const { user } = useCurrentUser();
+  const isAdmin = user?.role === "admin" || user?.role === "superadmin";
   const links = allLinks.filter((l) => !l.adminOnly || isAdmin);
 
-  function handleLogout() {
-    setUser(null);
-    setLocationId(null);
-    router.push("/");
+  async function handleLogout() {
+    await signOut({
+      fetchOptions: {
+        onSuccess: () => {
+          router.replace("/login");
+          router.refresh();
+        },
+      },
+    });
   }
 
   return (
