@@ -31,23 +31,26 @@ class DatabaseConnection:
 
     def _init_schema(self) -> None:
         with self.engine.connect() as conn:
-            # Create users table
+            # Create users table (without preferred_location_id, added via migration below)
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS users (
                     id TEXT PRIMARY KEY,
                     is_admin INTEGER NOT NULL DEFAULT 0,
                     is_super_admin INTEGER NOT NULL DEFAULT 0,
                     password TEXT,
-                    preferred_location_id TEXT,
                     created_at TEXT NOT NULL
                 )
             """))
+            conn.commit()
 
-            # Migration: add preferred_location_id to pre-existing users tables.
-            # SQLite lacks ADD COLUMN IF NOT EXISTS, so swallow the duplicate error.
+            # Migration: add preferred_location_id column if it doesn't exist.
+            # Use a separate transaction to avoid "transaction aborted" errors in PostgreSQL.
             try:
-                conn.execute(text("ALTER TABLE users ADD COLUMN preferred_location_id TEXT"))
+                with self.engine.connect() as migration_conn:
+                    migration_conn.execute(text("ALTER TABLE users ADD COLUMN preferred_location_id TEXT"))
+                    migration_conn.commit()
             except Exception:
+                # Column already exists or other error - safe to ignore
                 pass
 
             # Create locations table
@@ -58,6 +61,7 @@ class DatabaseConnection:
                     created_at TEXT NOT NULL
                 )
             """))
+            conn.commit()
 
             # Create location_users table
             conn.execute(text("""
@@ -69,6 +73,7 @@ class DatabaseConnection:
                     FOREIGN KEY (user_id) REFERENCES users(id)
                 )
             """))
+            conn.commit()
 
             # Create registrations table
             conn.execute(text("""
@@ -83,13 +88,16 @@ class DatabaseConnection:
                     FOREIGN KEY (location_id) REFERENCES locations(id)
                 )
             """))
+            conn.commit()
 
             # Create index on registrations
             try:
-                conn.execute(text("""
-                    CREATE INDEX IF NOT EXISTS idx_registrations_location_date
-                    ON registrations(location_id, date)
-                """))
+                with self.engine.connect() as index_conn:
+                    index_conn.execute(text("""
+                        CREATE INDEX IF NOT EXISTS idx_registrations_location_date
+                        ON registrations(location_id, date)
+                    """))
+                    index_conn.commit()
             except Exception:
                 pass
 
@@ -105,7 +113,6 @@ class DatabaseConnection:
                     FOREIGN KEY (location_id) REFERENCES locations(id)
                 )
             """))
-
             conn.commit()
 
 
