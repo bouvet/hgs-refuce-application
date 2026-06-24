@@ -4,12 +4,14 @@ import time
 from contextlib import asynccontextmanager
 from sqlalchemy import text
 from typing import List, Optional
+import jwt
 
 from fastapi import FastAPI, HTTPException, Query, Request, Response, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .logging_config import flush_logs, setup_logging
+from .auth import create_access_token, verify_access_token, extract_bearer_token
 from .models import (
     Report,
     SubmitReportRequest,
@@ -24,6 +26,7 @@ from .models import (
     CreateLocationRequest,
     LocationUserEntry,
     LoginRequest,
+    LoginResponse,
 )
 from .storage import UserStorage, DataStorage, DatabaseConnection, date_to_quarter
 
@@ -256,7 +259,7 @@ def admin_add_user_to_location(
 
 # ---------- auth endpoints ----------
 
-@app.post("/auth/login", response_model=User)
+@app.post("/auth/login", response_model=LoginResponse)
 def login(req: LoginRequest):
     if not user_storage.user_exists(req.username):
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -265,6 +268,15 @@ def login(req: LoginRequest):
     user = user_storage.get_user(req.username)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    access_token = create_access_token(user.id)
+    return LoginResponse(accessToken=access_token, user=user)
+
+
+@app.get("/auth/validate", response_model=User)
+def validate_token(user_id: str = Depends(get_user_id)):
+    user = user_storage.get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
     return user
 
 
