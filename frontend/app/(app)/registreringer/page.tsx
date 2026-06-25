@@ -1,6 +1,8 @@
 import { RegistrationsTableNoSSR as RegistrationsTable } from "@/components/stats/registrations-table-no-ssr";
+import { requireRole } from "@/lib/server-session";
 
-export default function RegistreringerPage() {
+export default async function RegistreringerPage() {
+  await requireRole(["admin", "superadmin"]);
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-0.5">

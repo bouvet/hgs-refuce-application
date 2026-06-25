@@ -1,37 +1,121 @@
+version: '3.9'
+
 services:
+  # PostgreSQL database for Better Auth (authentication, sessions, accounts)
+  auth-db:
+    image: postgres:16-alpine
+    container_name: hgs-refuce-auth-db
+    environment:
+      POSTGRES_DB: refuce_auth
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data
+      - ./scripts/init-better-auth-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d refuce_auth"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hgs-refuce-network
+
+  # PostgreSQL database for backend application data (locations, registrations, reports)
+  data-db:
+    image: postgres:16-alpine
+    container_name: hgs-refuce-data-db
+    environment:
+      POSTGRES_DB: refuce_data
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev
+    volumes:
+      - data_db_data:/var/lib/postgresql/data
+      - ./scripts/init-data-db.sql:/docker-entrypoint-initdb.d/01-init.sql
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d refuce_data"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hgs-refuce-network
+
+  # FastAPI backend service
   backend:
     build:
       context: ./backend_fast_api
       dockerfile: Dockerfile
+    container_name: hgs-refuce-backend
     ports:
-      - "8010:8000"
+      - "8000:8000"
     environment:
       APP_ENV: development
-      DATABASE_URL: sqlite:////app/data/app.db
-      BACKEND_CORS_ORIGINS: http://localhost:3000
-      SECRET_KEY: ${SECRET_KEY}
-      ADMIN_SECRET: ${ADMIN_SECRET}
-      LOG_LEVEL: INFO
-    volumes:
-      - backend_data:/app/data
+      DATABASE_URL: postgresql://postgres:dev@data-db:5432/refuce_data
+      BACKEND_CORS_ORIGINS: http://localhost:3000,http://frontend:3000
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      ADMIN_SECRET: ${ADMIN_SECRET:-dev-admin-secret}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      data-db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 15s
+    networks:
+      - hgs-refuce-network
 
+  # Next.js frontend service
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: /api
+        BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev-better-auth-secret-change-in-production}
+        BETTER_AUTH_URL: http://localhost:3000
+        AUTH_DATABASE_URL: postgresql://postgres:dev@auth-db:5432/refuce_auth
+        BACKEND_API_URL: http://backend:8000
+        BACKEND_SHARED_SECRET: ${BACKEND_SHARED_SECRET:-dev-shared-secret}
+        MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-b1ec52a4-fdce-4eed-9fa6-91a1d83a95c4}
+        MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-apL8Q~2mVEYbSZulWBkrz_cLe311SgEhvkjiBaF-}
+        MICROSOFT_TENANT_ID: ${MICROSOFT_TENANT_ID:-c317fa72-b393-44ea-a87c-ea272e8d963d}
+    container_name: hgs-refuce-frontend
     ports:
       - "3000:3000"
     environment:
+      # Better Auth configuration
+      BETTER_AUTH_URL: http://localhost:3000
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev-better-auth-secret-change-in-production}
+      AUTH_DATABASE_URL: postgresql://postgres:dev@auth-db:5432/refuce_auth
+      # Backend integration (server-side only)
       BACKEND_API_URL: http://backend:8000
+      BACKEND_SHARED_SECRET: ${BACKEND_SHARED_SECRET:-dev-shared-secret}
+      # Microsoft Entra ID SSO (uses default values from .env.local)
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-b1ec52a4-fdce-4eed-9fa6-91a1d83a95c4}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-apL8Q~2mVEYbSZulWBkrz_cLe311SgEhvkjiBaF-}
+      MICROSOFT_TENANT_ID: ${MICROSOFT_TENANT_ID:-c317fa72-b393-44ea-a87c-ea272e8d963d}
+      # Node.js
+      NODE_ENV: development
     depends_on:
       backend:
         condition: service_healthy
+      auth-db:
+        condition: service_healthy
+    networks:
+      - hgs-refuce-network
+
+networks:
+  hgs-refuce-network:
+    driver: bridge
 
 volumes:
-  backend_data:
+  auth_db_data:
+    driver: local
+  data_db_data:
+    driver: local

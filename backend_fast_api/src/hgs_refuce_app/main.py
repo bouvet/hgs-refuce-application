@@ -4,22 +4,29 @@ import time
 from contextlib import asynccontextmanager
 from sqlalchemy import text
 from typing import List, Optional
+import jwt
 
 from fastapi import FastAPI, HTTPException, Query, Request, Response, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .logging_config import flush_logs, setup_logging
+from .auth import create_access_token, verify_access_token, extract_bearer_token
 from .models import (
     Report,
     SubmitReportRequest,
     WasteRegistration,
     Location,
     User,
+    CurrentUser,
+    SsoResolveRequest,
+    SsoResolveResponse,
+    SetPreferredLocationRequest,
     CreateUserRequest,
     CreateLocationRequest,
     LocationUserEntry,
     LoginRequest,
+    LoginResponse,
 )
 from .storage import UserStorage, DataStorage, DatabaseConnection, date_to_quarter
 
@@ -125,6 +132,20 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 def _now_iso() -> str:
     from datetime import datetime, timezone
     return datetime.now(timezone.utc).isoformat()
+
+
+def _role_for(user: User) -> str:
+    """Normalize the stored isAdmin/isSuperAdmin flags into a single role.
+
+    superadmin -> isSuperAdmin is True
+    admin      -> isAdmin is True and not isSuperAdmin
+    user       -> otherwise
+    """
+    if user.isSuperAdmin:
+        return "superadmin"
+    if user.isAdmin:
+        return "admin"
+    return "user"
 
 
 def get_user_id(x_user_id: Optional[str] = Header(None)) -> str:
@@ -238,7 +259,7 @@ def admin_add_user_to_location(
 
 # ---------- auth endpoints ----------
 
-@app.post("/auth/login", response_model=User)
+@app.post("/auth/login", response_model=LoginResponse)
 def login(req: LoginRequest):
     if not user_storage.user_exists(req.username):
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -247,7 +268,59 @@ def login(req: LoginRequest):
     user = user_storage.get_user(req.username)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    access_token = create_access_token(user.id)
+    return LoginResponse(accessToken=access_token, user=user)
+
+
+@app.get("/auth/validate", response_model=User)
+def validate_token(user_id: str = Depends(get_user_id)):
+    user = user_storage.get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
     return user
+
+
+@app.post("/auth/sso-resolve", response_model=SsoResolveResponse)
+def sso_resolve(req: SsoResolveRequest):
+    # Map an Entra email to a backend user. Backend users are provisioned with
+    # their email as the user id; we only confirm the user exists and return
+    # their identity + normalized role. The frontend stores backendUserId only.
+    user = user_storage.get_user(req.email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not provisioned")
+    return SsoResolveResponse(backendUserId=user.id, role=_role_for(user))
+
+
+# ---------- current user ----------
+
+@app.get("/currentUser", response_model=CurrentUser)
+def get_current_user(user_id: str = Depends(get_user_id)):
+    user = user_storage.get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    locations = user_storage.get_user_locations(user_id)
+    preferred = user_storage.get_preferred_location(user_id)
+    # Only surface a preferred location the user still has access to.
+    if preferred and not any(loc.id == preferred for loc in locations):
+        preferred = None
+    return CurrentUser(
+        backendUserId=user.id,
+        role=_role_for(user),
+        locations=locations,
+        preferredLocationId=preferred,
+    )
+
+
+@app.patch("/currentUser/location", status_code=204, response_class=Response)
+def set_my_location(
+    req: SetPreferredLocationRequest,
+    user_id: str = Depends(get_user_id),
+):
+    locations = user_storage.get_user_locations(user_id)
+    if not any(loc.id == req.locationId for loc in locations):
+        raise HTTPException(status_code=403, detail="No access to this location")
+    user_storage.set_preferred_location(user_id, req.locationId)
+    return Response(status_code=204)
 
 
 # ---------- user endpoints ----------

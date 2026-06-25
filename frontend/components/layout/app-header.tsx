@@ -12,8 +12,10 @@ import {
   BarChart3,
   Plus,
   History,
+  MapPin,
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { signOut } from "@/lib/auth-client";
 import { Badge } from "@/components/ui/badge";
 import {
   Sheet,
@@ -45,14 +47,19 @@ const allLinks = [
 export function AppHeader() {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, setUser, setLocationId } = useCurrentUser();
-  const isAdmin = user?.role === "admin";
+  const { user, locationName } = useCurrentUser();
+  const isAdmin = user?.role === "admin" || user?.role === "superadmin";
   const links = allLinks.filter((l) => !l.adminOnly || isAdmin);
 
-  function handleLogout() {
-    setUser(null);
-    setLocationId(null);
-    router.push("/");
+  async function handleLogout() {
+    await signOut({
+      fetchOptions: {
+        onSuccess: () => {
+          router.replace("/login");
+          router.refresh();
+        },
+      },
+    });
   }
 
   return (
@@ -141,6 +148,14 @@ export function AppHeader() {
             <div className="text-[13px] font-semibold text-foreground mt-0.5">
               {user?.name ?? "Bruker"}
             </div>
+            <SheetClose
+              nativeButton={false}
+              render={<Link href="/select-location" />}
+              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground mt-1.5 transition-colors"
+            >
+              <MapPin className="size-3 shrink-0" />
+              <span className="truncate">{locationName ?? "Velg lokasjon"}</span>
+            </SheetClose>
             <button
               onClick={handleLogout}
               className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground mt-2 transition-colors"

@@ -21,7 +21,9 @@ export function SuperAdminContent() {
   const [newLocName, setNewLocName] = useState("");
   const [selectedLocForUser, setSelectedLocForUser] = useState("");
   const [selectedUserForLoc, setSelectedUserForLoc] = useState("");
-  const [locationUsers, setLocationUsers] = useState<Record<string, string[]>>({});
+  const [locationUsers, setLocationUsers] = useState<Record<string, string[]>>(
+    {},
+  );
   const [expandedLoc, setExpandedLoc] = useState<string | null>(null);
 
   const userId = user?.id;
@@ -31,11 +33,13 @@ export function SuperAdminContent() {
     (async () => {
       try {
         setLoadingLocations(true);
-        const locs = await api.getMyLocations(userId);
+        const locs = await api.getMyLocations();
         setLocations(locs);
         setError("");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Klarte ikke å hente lokasjoner");
+        setError(
+          err instanceof Error ? err.message : "Klarte ikke å hente lokasjoner",
+        );
       } finally {
         setLoadingLocations(false);
       }
@@ -43,11 +47,13 @@ export function SuperAdminContent() {
     (async () => {
       try {
         setLoadingUsers(true);
-        const userList = await api.listAllUsers(userId);
+        const userList = await api.listAllUsers();
         setUsers(userList);
         setError("");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Klarte ikke å hente brukere");
+        setError(
+          err instanceof Error ? err.message : "Klarte ikke å hente brukere",
+        );
       } finally {
         setLoadingUsers(false);
       }
@@ -58,11 +64,13 @@ export function SuperAdminContent() {
     if (!userId) return;
     try {
       setLoadingLocations(true);
-      const locs = await api.getMyLocations(userId);
+      const locs = await api.getMyLocations();
       setLocations(locs);
       setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Klarte ikke å hente lokasjoner");
+      setError(
+        err instanceof Error ? err.message : "Klarte ikke å hente lokasjoner",
+      );
     } finally {
       setLoadingLocations(false);
     }
@@ -72,11 +80,13 @@ export function SuperAdminContent() {
     if (!userId) return;
     try {
       setLoadingUsers(true);
-      const userList = await api.listAllUsers(userId);
+      const userList = await api.listAllUsers();
       setUsers(userList);
       setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Klarte ikke å hente brukere");
+      setError(
+        err instanceof Error ? err.message : "Klarte ikke å hente brukere",
+      );
     } finally {
       setLoadingUsers(false);
     }
@@ -85,10 +95,12 @@ export function SuperAdminContent() {
   async function fetchLocationUsers(locationId: string) {
     if (!userId) return;
     try {
-      const locUsers = await api.listLocationUsers(userId, locationId);
+      const locUsers = await api.listLocationUsers(locationId);
       setLocationUsers((prev) => ({ ...prev, [locationId]: locUsers }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Klarte ikke å hente brukere");
+      setError(
+        err instanceof Error ? err.message : "Klarte ikke å hente brukere",
+      );
     }
   }
 
@@ -96,14 +108,16 @@ export function SuperAdminContent() {
     if (!newUsername.trim() || !userId) return;
     try {
       setLoadingUsers(true);
-      await api.createUser(userId, newUsername.trim(), newUserIsAdmin);
+      await api.createUser(newUsername.trim(), newUserIsAdmin);
       setNewUsername("");
       setNewUserIsAdmin(false);
       setSuccess("Bruker opprettet");
       await fetchUsers();
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Klarte ikke å opprette bruker");
+      setError(
+        err instanceof Error ? err.message : "Klarte ikke å opprette bruker",
+      );
     } finally {
       setLoadingUsers(false);
     }
@@ -112,12 +126,14 @@ export function SuperAdminContent() {
   async function deleteUser(targetUserId: string): Promise<void> {
     if (!userId || !confirm(`Slett bruker ${targetUserId}?`)) return;
     try {
-      await api.deleteUser(userId, targetUserId);
+      await api.deleteUser(targetUserId);
       setSuccess(`Bruker ${targetUserId} slettet`);
       await fetchUsers();
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Klarte ikke å slette bruker");
+      setError(
+        err instanceof Error ? err.message : "Klarte ikke å slette bruker",
+      );
     }
   }
 
@@ -125,13 +141,15 @@ export function SuperAdminContent() {
     if (!newLocName.trim() || !userId) return;
     try {
       setLoadingLocations(true);
-      await api.createLocation(userId, newLocName.trim());
+      await api.createLocation(newLocName.trim());
       setNewLocName("");
       setSuccess("Lokasjon opprettet");
       await fetchLocations();
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Klarte ikke å opprette lokasjon");
+      setError(
+        err instanceof Error ? err.message : "Klarte ikke å opprette lokasjon",
+      );
     } finally {
       setLoadingLocations(false);
     }
@@ -140,7 +158,7 @@ export function SuperAdminContent() {
   async function deleteLocation(locationId: string) {
     if (!userId || !confirm(`Slett lokasjon ${locationId}?`)) return;
     try {
-      await api.deleteLocation(userId, locationId);
+      await api.deleteLocation(locationId);
       setSuccess(`Lokasjon ${locationId} slettet`);
       await fetchLocations();
       setLocationUsers((prev) => {
@@ -150,32 +168,41 @@ export function SuperAdminContent() {
       });
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Klarte ikke å slette lokasjon");
+      setError(
+        err instanceof Error ? err.message : "Klarte ikke å slette lokasjon",
+      );
     }
   }
 
   async function addUserToLocation() {
     if (!selectedLocForUser || !selectedUserForLoc || !userId) return;
     try {
-      await api.addUserToLocation(userId, selectedLocForUser, selectedUserForLoc);
+      await api.addUserToLocation(selectedLocForUser, selectedUserForLoc);
       setSelectedUserForLoc("");
       setSuccess(`Bruker lagt til i lokasjon`);
       await fetchLocationUsers(selectedLocForUser);
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Klarte ikke å legge til bruker");
+      setError(
+        err instanceof Error ? err.message : "Klarte ikke å legge til bruker",
+      );
     }
   }
 
-  async function removeUserFromLocation(locationId: string, targetUserId: string) {
+  async function removeUserFromLocation(
+    locationId: string,
+    targetUserId: string,
+  ) {
     if (!userId) return;
     try {
-      await api.removeUserFromLocation(userId, locationId, targetUserId);
+      await api.removeUserFromLocation(locationId, targetUserId);
       setSuccess(`Bruker fjernet fra lokasjon`);
       await fetchLocationUsers(locationId);
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Klarte ikke å fjerne bruker");
+      setError(
+        err instanceof Error ? err.message : "Klarte ikke å fjerne bruker",
+      );
     }
   }
 
@@ -192,7 +219,9 @@ export function SuperAdminContent() {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold mb-2">Administrasjon</h1>
-        <p className="text-muted-foreground">Administrer brukere og lokasjoner</p>
+        <p className="text-muted-foreground">
+          Administrer brukere og lokasjoner
+        </p>
       </div>
 
       {error && (
@@ -242,7 +271,9 @@ export function SuperAdminContent() {
             </div>
 
             <div className="space-y-2">
-              {loadingUsers && <p className="text-muted-foreground">Laster brukere...</p>}
+              {loadingUsers && (
+                <p className="text-muted-foreground">Laster brukere...</p>
+              )}
               {!loadingUsers && users.length === 0 && (
                 <p className="text-muted-foreground">Ingen brukere funnet</p>
               )}
@@ -287,16 +318,23 @@ export function SuperAdminContent() {
             </div>
 
             <div className="space-y-2">
-              {loadingLocations && <p className="text-muted-foreground">Laster lokasjoner...</p>}
+              {loadingLocations && (
+                <p className="text-muted-foreground">Laster lokasjoner...</p>
+              )}
               {!loadingLocations && locations.length === 0 && (
                 <p className="text-muted-foreground">Ingen lokasjoner funnet</p>
               )}
               {locations.map((loc) => (
-                <div key={loc.id} className="rounded-lg border border-border bg-card">
+                <div
+                  key={loc.id}
+                  className="rounded-lg border border-border bg-card"
+                >
                   <div className="flex items-center justify-between p-3">
                     <div>
                       <div className="font-medium">{loc.name}</div>
-                      <div className="text-sm text-muted-foreground">{loc.id}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {loc.id}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
@@ -327,7 +365,9 @@ export function SuperAdminContent() {
                         <div className="flex gap-2">
                           <select
                             value={selectedUserForLoc}
-                            onChange={(e) => setSelectedUserForLoc(e.target.value)}
+                            onChange={(e) =>
+                              setSelectedUserForLoc(e.target.value)
+                            }
                             className="flex-1 px-3 py-2 rounded-lg border border-border bg-card outline-none focus:border-primary text-sm"
                           >
                             <option value="">Velg bruker</option>
@@ -355,7 +395,8 @@ export function SuperAdminContent() {
                           Brukere i denne lokasjonen
                         </label>
                         <div className="space-y-1 bg-background/50 rounded-lg p-2">
-                          {!locationUsers[loc.id] || locationUsers[loc.id].length === 0 ? (
+                          {!locationUsers[loc.id] ||
+                          locationUsers[loc.id].length === 0 ? (
                             <p className="text-sm text-muted-foreground p-2">
                               Ingen brukere
                             </p>
@@ -367,7 +408,9 @@ export function SuperAdminContent() {
                               >
                                 <span>{u}</span>
                                 <button
-                                  onClick={() => removeUserFromLocation(loc.id, u)}
+                                  onClick={() =>
+                                    removeUserFromLocation(loc.id, u)
+                                  }
                                   className="p-1 text-red-500 hover:bg-red-500/10 rounded transition-colors"
                                 >
                                   <Trash2 className="size-3" />

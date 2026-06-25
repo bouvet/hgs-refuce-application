@@ -20,11 +20,13 @@ export interface WasteRepository {
   getReportForDate(date: string): Promise<Report | null>;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8010";
+const API_URL = "/api";
 
-export function createWasteRepository(
-  locationId: string,
-  userId: string,
-): WasteRepository {
-  return new BackendWasteRepository(API_URL, locationId, userId);
+/**
+ * Build a repository scoped to a single location. User identity is
+ * injected server-side by the Next.js API proxy from the Better Auth
+ * session — no `userId` argument is required (or accepted) here.
+ */
+export function createWasteRepository(locationId: string): WasteRepository {
+  return new BackendWasteRepository(API_URL, locationId);
 }

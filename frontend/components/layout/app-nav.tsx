@@ -28,7 +28,7 @@ const allLinks = [
 export function AppNav() {
   const pathname = usePathname();
   const { user } = useCurrentUser();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" || user?.role === "superadmin";
 
   if (isAdmin) return null;
 

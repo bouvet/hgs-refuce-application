@@ -31,7 +31,7 @@ class DatabaseConnection:
 
     def _init_schema(self) -> None:
         with self.engine.connect() as conn:
-            # Create users table
+            # Create users table (without preferred_location_id, added via migration below)
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS users (
                     id TEXT PRIMARY KEY,
@@ -41,6 +41,17 @@ class DatabaseConnection:
                     created_at TEXT NOT NULL
                 )
             """))
+            conn.commit()
+
+            # Migration: add preferred_location_id column if it doesn't exist.
+            # Use a separate transaction to avoid "transaction aborted" errors in PostgreSQL.
+            try:
+                with self.engine.connect() as migration_conn:
+                    migration_conn.execute(text("ALTER TABLE users ADD COLUMN preferred_location_id TEXT"))
+                    migration_conn.commit()
+            except Exception:
+                # Column already exists or other error - safe to ignore
+                pass
 
             # Create locations table
             conn.execute(text("""
@@ -50,6 +61,7 @@ class DatabaseConnection:
                     created_at TEXT NOT NULL
                 )
             """))
+            conn.commit()
 
             # Create location_users table
             conn.execute(text("""
@@ -61,6 +73,7 @@ class DatabaseConnection:
                     FOREIGN KEY (user_id) REFERENCES users(id)
                 )
             """))
+            conn.commit()
 
             # Create registrations table
             conn.execute(text("""
@@ -75,13 +88,16 @@ class DatabaseConnection:
                     FOREIGN KEY (location_id) REFERENCES locations(id)
                 )
             """))
+            conn.commit()
 
             # Create index on registrations
             try:
-                conn.execute(text("""
-                    CREATE INDEX IF NOT EXISTS idx_registrations_location_date
-                    ON registrations(location_id, date)
-                """))
+                with self.engine.connect() as index_conn:
+                    index_conn.execute(text("""
+                        CREATE INDEX IF NOT EXISTS idx_registrations_location_date
+                        ON registrations(location_id, date)
+                    """))
+                    index_conn.commit()
             except Exception:
                 pass
 
@@ -97,7 +113,6 @@ class DatabaseConnection:
                     FOREIGN KEY (location_id) REFERENCES locations(id)
                 )
             """))
-
             conn.commit()
 
 
@@ -260,6 +275,22 @@ class UserStorage:
                 Location(id=row[0], name=row[1], createdAt=row[2])
                 for row in result.fetchall()
             ]
+
+    def get_preferred_location(self, user_id: str) -> Optional[str]:
+        with self.engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT preferred_location_id FROM users WHERE id = :id
+            """), {"id": user_id})
+            row = result.fetchone()
+            return row[0] if row and row[0] else None
+
+    def set_preferred_location(self, user_id: str, location_id: str) -> None:
+        with self.engine.connect() as conn:
+            conn.execute(text("""
+                UPDATE users SET preferred_location_id = :loc WHERE id = :id
+            """), {"loc": location_id, "id": user_id})
+            conn.commit()
+            logger.debug("set preferred location %s for user %s", location_id, user_id)
 
     def list_users_in_location(self, location_id: str) -> List[str]:
         with self.engine.connect() as conn:
