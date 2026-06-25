@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { Leaf } from "lucide-react";
 import { requireSession, getBackendUserId } from "@/lib/server-session";
 import { getCurrentUser } from "@/lib/server-currentUser";

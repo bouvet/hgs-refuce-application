@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { redirect } from "next/navigation";
 import { getServerSession, getBackendUserId } from "@/lib/server-session";
 import { getCurrentUser } from "@/lib/server-currentUser";
