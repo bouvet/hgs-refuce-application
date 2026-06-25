@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession, getBackendUserId } from "@/lib/server-session";
 import { userIdentityHeaders } from "@/lib/server-api";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Authenticated reverse-proxy to the FastAPI backend.
  *
