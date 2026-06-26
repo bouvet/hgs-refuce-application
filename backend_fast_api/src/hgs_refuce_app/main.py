@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .logging_config import flush_logs, setup_logging
-from .auth import create_access_token, verify_access_token, extract_bearer_token
+from .auth import create_access_token, verify_access_token, extract_bearer_token, verify_service_hmac
 from .models import (
     Report,
     SubmitReportRequest,
@@ -69,6 +69,13 @@ async def lifespan(_: FastAPI):
         user_storage.create_user("stavangerUser", is_admin=False, password="123")
     if not user_storage.location_has_access(stavanger_id, "stavangerUser"):
         user_storage.add_user_to_location(stavanger_id, "stavangerUser")
+    # Ensure SSO test user exists (for development)
+    bouvet = user_storage.get_location_by_name("Bouvet Office") or None
+    if bouvet:
+        sso_test_email = "sso-test@example.com"
+        if not user_storage.user_exists(sso_test_email):
+            user_storage.create_user(sso_test_email, is_admin=False)
+            user_storage.add_user_to_location(bouvet.id, sso_test_email)
     try:
         yield
     finally:
@@ -161,6 +168,19 @@ def get_admin_secret(x_admin_secret: Optional[str] = Header(None)) -> str:
     if x_admin_secret != expected:
         raise HTTPException(status_code=403, detail="Invalid admin secret")
     return x_admin_secret
+
+
+def verify_service_auth(
+    x_user_sig_version: Optional[str] = Header(None),
+    x_user_sig_timestamp: Optional[str] = Header(None),
+    x_user_sig: Optional[str] = Header(None),
+) -> None:
+    if not x_user_sig_version or not x_user_sig_timestamp or not x_user_sig:
+        raise HTTPException(status_code=401, detail="Missing signature headers")
+    try:
+        verify_service_hmac(x_user_sig, x_user_sig_timestamp, x_user_sig_version)
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
 
 
 def require_admin(user_id: str = Depends(get_user_id)) -> str:
@@ -260,7 +280,10 @@ def admin_add_user_to_location(
 # ---------- auth endpoints ----------
 
 @app.post("/auth/login", response_model=LoginResponse)
-def login(req: LoginRequest):
+def login(
+    req: LoginRequest,
+    _: None = Depends(verify_service_auth),
+):
     if not user_storage.user_exists(req.username):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     if not user_storage.check_password(req.username, req.password):
@@ -281,12 +304,16 @@ def validate_token(user_id: str = Depends(get_user_id)):
 
 
 @app.post("/auth/sso-resolve", response_model=SsoResolveResponse)
-def sso_resolve(req: SsoResolveRequest):
-    # Map an Entra email to a backend user. Backend users are provisioned with
-    # their email as the user id; we only confirm the user exists and return
-    # their identity + normalized role. The frontend stores backendUserId only.
+def sso_resolve(
+    req: SsoResolveRequest,
+    _: None = Depends(verify_service_auth),
+):
+    # Map an Entra email to a backend user. Backend users must be provisioned
+    # by an admin before they can sign in via SSO. This endpoint is called by
+    # Better Auth's user-create hook during the first SSO sign-in.
     user = user_storage.get_user(req.email)
     if not user:
+        logger.warning("sso_resolve: user not found for email %s", req.email)
         raise HTTPException(status_code=404, detail="User not provisioned")
     return SsoResolveResponse(backendUserId=user.id, role=_role_for(user))
 
