@@ -7,16 +7,34 @@ import hashlib
 
 logger = logging.getLogger(__name__)
 
-JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-change-in-production")
+_IS_PRODUCTION = os.environ.get("APP_ENV", "development").lower() == "production"
+_INSECURE_DEFAULT = "dev-secret-change-in-production"
+
+
+def _load_secret(name: str) -> str:
+    """Load a secret env var. In production, refuse to start without it.
+
+    Matches the frontend's `auth-env.ts` posture: fail loud rather than silently
+    fall back to a placeholder. The HMAC pair (frontend + backend) cannot match
+    unless both sides agree on the secret, so a misconfiguration here surfaces
+    as 401s on every signed call.
+    """
+    value = os.environ.get(name)
+    if value and value.strip():
+        return value
+    if _IS_PRODUCTION:
+        raise RuntimeError(
+            f"{name} is required in production but is not set. "
+            "Refusing to start with an insecure default."
+        )
+    logger.warning("%s not set, using insecure default for development only", name)
+    return _INSECURE_DEFAULT
+
+
+JWT_SECRET = _load_secret("JWT_SECRET")
 JWT_ALGORITHM = "HS256"
-BACKEND_SHARED_SECRET = os.environ.get("BACKEND_SHARED_SECRET", "dev-secret-change-in-production")
+BACKEND_SHARED_SECRET = _load_secret("BACKEND_SHARED_SECRET")
 SIGNATURE_VERSION = "v1"
-
-if not os.environ.get("JWT_SECRET"):
-    logger.warning("JWT_SECRET not set, using insecure default for development only")
-
-if not os.environ.get("BACKEND_SHARED_SECRET"):
-    logger.warning("BACKEND_SHARED_SECRET not set, using insecure default for development only")
 
 
 def create_access_token(user_id: str) -> str:

@@ -1,12 +1,13 @@
 from fastapi.testclient import TestClient
 from sqlalchemy import text
-from hgs_refuce_app.main import app, user_storage, data_storage
+from hgs_refuce_app.main import app, user_storage, data_storage, verify_service_auth
 
 client = TestClient(app)
 
 ADMIN_SECRET = "test-admin-secret"
 TEST_USER = "test-user"
 TEST_ADMIN = "test-admin"
+TEST_SUPERADMIN = "test-superadmin"
 
 
 def setup_function():
@@ -14,11 +15,21 @@ def setup_function():
         conn.execute(text("DELETE FROM location_users"))
         conn.execute(text("DELETE FROM locations"))
         conn.execute(text("DELETE FROM users"))
+        conn.execute(text("DELETE FROM pending_access_requests"))
         conn.commit()
     with data_storage.engine.connect() as conn:
         conn.execute(text("DELETE FROM registrations"))
         conn.execute(text("DELETE FROM reports"))
         conn.commit()
+    # Tests for endpoints that require a service-signed call bypass the
+    # HMAC verification — the signing/verification path is exercised by
+    # the dedicated `verify_service_hmac` unit and by manual integration
+    # tests against the running backend.
+    app.dependency_overrides[verify_service_auth] = lambda: None
+
+
+def teardown_function():
+    app.dependency_overrides.pop(verify_service_auth, None)
 
 
 def _seed_location_and_user():
@@ -432,3 +443,155 @@ def test_lock_isolated_by_location():
         headers=_headers()
     )
     assert resp.status_code == 409
+
+
+# ---------- sso-resolve + pending access requests ----------
+
+
+def _seed_superadmin():
+    user_storage.create_user(TEST_SUPERADMIN, is_admin=True, is_super_admin=True)
+
+
+def test_sso_resolve_known_email_returns_resolved():
+    user_storage.create_user("alice@bouvet.no", is_admin=False)
+    resp = client.post(
+        "/auth/sso-resolve",
+        json={"email": "alice@bouvet.no", "name": "Alice"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "resolved"
+    assert body["backendUserId"] == "alice@bouvet.no"
+    assert body["role"] == "user"
+    # No pending row should be created for a known user.
+    assert user_storage.list_pending_requests() == []
+
+
+def test_sso_resolve_unknown_email_returns_pending_and_queues():
+    resp = client.post(
+        "/auth/sso-resolve",
+        json={"email": "bob@bouvet.no", "name": "Bob"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "pending"
+    assert body.get("backendUserId") is None
+    pending = user_storage.list_pending_requests()
+    assert len(pending) == 1
+    assert pending[0].email == "bob@bouvet.no"
+    assert pending[0].name == "Bob"
+
+
+def test_sso_resolve_retry_updates_last_attempt_without_duplicating():
+    client.post("/auth/sso-resolve", json={"email": "carol@bouvet.no", "name": "Carol"})
+    first = user_storage.list_pending_requests()[0]
+    # Second attempt: name omitted; existing name should be preserved.
+    client.post("/auth/sso-resolve", json={"email": "carol@bouvet.no"})
+    pending = user_storage.list_pending_requests()
+    assert len(pending) == 1
+    assert pending[0].email == "carol@bouvet.no"
+    assert pending[0].name == "Carol"
+    assert pending[0].requestedAt == first.requestedAt
+    assert pending[0].lastAttemptAt >= first.lastAttemptAt
+
+
+def test_access_requests_list_requires_superadmin():
+    _seed_superadmin()
+    user_storage.create_user(TEST_ADMIN, is_admin=True)
+    client.post("/auth/sso-resolve", json={"email": "dan@bouvet.no", "name": "Dan"})
+
+    resp = client.get("/admin/access-requests", headers=_headers(TEST_ADMIN))
+    assert resp.status_code == 403
+
+    resp = client.get("/admin/access-requests", headers=_headers(TEST_SUPERADMIN))
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) == 1
+    assert body[0]["email"] == "dan@bouvet.no"
+
+
+def test_access_requests_delete_dismisses_then_404():
+    _seed_superadmin()
+    client.post("/auth/sso-resolve", json={"email": "eve@bouvet.no"})
+
+    resp = client.delete(
+        "/admin/access-requests/eve@bouvet.no",
+        headers=_headers(TEST_SUPERADMIN),
+    )
+    assert resp.status_code == 204
+    assert user_storage.list_pending_requests() == []
+
+    resp = client.delete(
+        "/admin/access-requests/eve@bouvet.no",
+        headers=_headers(TEST_SUPERADMIN),
+    )
+    assert resp.status_code == 404
+
+
+# ---------- create-user form modes (SSO vs PIN) ----------
+
+
+def test_create_sso_user_clears_matching_pending_request():
+    _seed_superadmin()
+    user_storage.create_user(TEST_ADMIN, is_admin=True)
+    client.post("/auth/sso-resolve", json={"email": "frank@bouvet.no", "name": "Frank"})
+    assert len(user_storage.list_pending_requests()) == 1
+
+    resp = client.post(
+        "/users",
+        json={"id": "frank@bouvet.no", "isAdmin": False, "name": "Frank"},
+        headers=_headers(TEST_ADMIN),
+    )
+    assert resp.status_code == 201
+    assert resp.json()["id"] == "frank@bouvet.no"
+    # Provisioning an SSO user clears the matching pending request.
+    assert user_storage.list_pending_requests() == []
+    # Password column is NULL for SSO users.
+    assert user_storage.check_password("frank@bouvet.no", "anything") is False
+
+
+def test_create_pin_user_with_password_succeeds_and_login_works():
+    user_storage.create_user(TEST_ADMIN, is_admin=True)
+    resp = client.post(
+        "/users",
+        json={"id": "stavangerUser", "isAdmin": False, "password": "1234"},
+        headers=_headers(TEST_ADMIN),
+    )
+    assert resp.status_code == 201
+    # The PIN we just set must be usable on /auth/login.
+    login = client.post(
+        "/auth/login",
+        json={"username": "stavangerUser", "password": "1234"},
+    )
+    assert login.status_code == 200
+    assert login.json()["user"]["id"] == "stavangerUser"
+
+
+def test_create_user_validation_rejects_sso_without_at():
+    user_storage.create_user(TEST_ADMIN, is_admin=True)
+    resp = client.post(
+        "/users",
+        json={"id": "no-at-sign", "isAdmin": False},
+        headers=_headers(TEST_ADMIN),
+    )
+    assert resp.status_code == 422
+
+
+def test_create_user_validation_rejects_pin_with_at():
+    user_storage.create_user(TEST_ADMIN, is_admin=True)
+    resp = client.post(
+        "/users",
+        json={"id": "user@bouvet.no", "isAdmin": False, "password": "1234"},
+        headers=_headers(TEST_ADMIN),
+    )
+    assert resp.status_code == 422
+
+
+def test_create_user_validation_rejects_short_pin():
+    user_storage.create_user(TEST_ADMIN, is_admin=True)
+    resp = client.post(
+        "/users",
+        json={"id": "shorty", "isAdmin": False, "password": "12"},
+        headers=_headers(TEST_ADMIN),
+    )
+    assert resp.status_code == 422

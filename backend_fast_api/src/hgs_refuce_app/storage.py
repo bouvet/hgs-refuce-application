@@ -4,7 +4,7 @@ from typing import List, Optional
 from datetime import datetime
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
-from .models import WasteRegistration, Report, Location, User
+from .models import WasteRegistration, Report, Location, User, PendingAccessRequest
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +111,19 @@ class DatabaseConnection:
                     submitted_by TEXT NOT NULL,
                     PRIMARY KEY (period, location_id),
                     FOREIGN KEY (location_id) REFERENCES locations(id)
+                )
+            """))
+            conn.commit()
+
+            # Create pending_access_requests table. Used to track SSO sign-in
+            # attempts from emails not yet provisioned in `users`. The admin
+            # panel surfaces these so a superadmin can approve or dismiss.
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS pending_access_requests (
+                    email TEXT PRIMARY KEY,
+                    name TEXT,
+                    requested_at TEXT NOT NULL,
+                    last_attempt_at TEXT NOT NULL
                 )
             """))
             conn.commit()
@@ -298,6 +311,53 @@ class UserStorage:
                 SELECT user_id FROM location_users WHERE location_id = :location_id ORDER BY user_id
             """), {"location_id": location_id})
             return [row[0] for row in result.fetchall()]
+
+    # ---------- pending access requests ----------
+
+    def upsert_pending_request(self, email: str, name: Optional[str]) -> None:
+        """Insert a new pending request, or refresh `last_attempt_at` if one exists.
+
+        Used when an SSO sign-in arrives for an email that has no row in `users`.
+        ON CONFLICT keeps the original `requested_at` (first-seen time) while
+        bumping `last_attempt_at` so admins can tell active retries from stale rows.
+        """
+        now = datetime.utcnow().isoformat()
+        with self.engine.connect() as conn:
+            conn.execute(text("""
+                INSERT INTO pending_access_requests (email, name, requested_at, last_attempt_at)
+                VALUES (:email, :name, :now, :now)
+                ON CONFLICT (email) DO UPDATE SET
+                    last_attempt_at = :now,
+                    name = COALESCE(EXCLUDED.name, pending_access_requests.name)
+            """), {"email": email, "name": name, "now": now})
+            conn.commit()
+            logger.debug("upserted pending access request for %s", email)
+
+    def list_pending_requests(self) -> List[PendingAccessRequest]:
+        with self.engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT email, name, requested_at, last_attempt_at
+                FROM pending_access_requests
+                ORDER BY last_attempt_at DESC
+            """))
+            return [
+                PendingAccessRequest(
+                    email=row[0],
+                    name=row[1],
+                    requestedAt=row[2],
+                    lastAttemptAt=row[3],
+                )
+                for row in result.fetchall()
+            ]
+
+    def delete_pending_request(self, email: str) -> bool:
+        with self.engine.connect() as conn:
+            result = conn.execute(
+                text("DELETE FROM pending_access_requests WHERE email = :email"),
+                {"email": email},
+            )
+            conn.commit()
+            return result.rowcount > 0
 
 
 class DataStorage:

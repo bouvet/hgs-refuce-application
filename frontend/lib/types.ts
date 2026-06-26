@@ -56,3 +56,28 @@ export type AdminUser = {
   isAdmin: boolean;
   isSuperAdmin: boolean;
 };
+
+/**
+ * A pending SSO access request — created when an unknown Entra user
+ * successfully signs in to Better Auth but has no row in the backend
+ * `users` table. Superadmins approve or dismiss these from the admin
+ * panel.
+ */
+export type PendingAccessRequest = {
+  email: string;
+  name: string | null;
+  requestedAt: string;
+  lastAttemptAt: string;
+};
+
+/**
+ * Payload for `POST /users`. The backend enforces:
+ *   - `password` set ⇒ PIN user, `id` must not contain `@`, password ≥ 4 chars.
+ *   - `password` unset ⇒ SSO user, `id` must contain `@`.
+ */
+export type CreateUserPayload = {
+  id: string;
+  isAdmin: boolean;
+  password?: string;
+  name?: string;
+};
