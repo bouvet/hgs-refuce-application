@@ -3,6 +3,7 @@ import type {
   CreateUserPayload,
   Location,
   PendingAccessRequest,
+  UpdateUserPayload,
 } from "@/lib/types";
 
 /**
@@ -93,6 +94,16 @@ export const api = {
     return request<AdminUser>("/users", {
       method: "POST",
       body: JSON.stringify(payload),
+    });
+  },
+
+  updateUser: async (
+    targetUserId: string,
+    patch: UpdateUserPayload,
+  ): Promise<AdminUser> => {
+    return request<AdminUser>(`/users/${encodeURIComponent(targetUserId)}`, {
+      method: "PUT",
+      body: JSON.stringify(patch),
     });
   },
 

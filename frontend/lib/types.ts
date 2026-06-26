@@ -55,6 +55,7 @@ export type AdminUser = {
   id: string;
   isAdmin: boolean;
   isSuperAdmin: boolean;
+  name: string | null;
 };
 
 /**
@@ -80,4 +81,15 @@ export type CreateUserPayload = {
   isAdmin: boolean;
   password?: string;
   name?: string;
+};
+
+/**
+ * Patch payload for `PUT /users/{id}`. Each field is optional; only the keys
+ * present are written. The backend enforces that only superadmins may toggle
+ * `isAdmin` or `isSuperAdmin`, and refuses to demote the last superadmin.
+ */
+export type UpdateUserPayload = {
+  name?: string | null;
+  isAdmin?: boolean;
+  isSuperAdmin?: boolean;
 };

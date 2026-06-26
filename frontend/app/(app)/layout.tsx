@@ -22,11 +22,17 @@ export default async function AppLayout({
   }
 
   // Seed the read-only client session view from the backend's source of truth.
+  // Prefer the backend-managed name (editable from the admin panel) over the
+  // Better Auth name, so renaming a user in the admin UI shows up immediately
+  // without having to re-issue the BA session.
   const sessionData = {
     user: {
       id: currentUser.backendUserId,
       name:
-        session.user.name ?? session.user.email ?? currentUser.backendUserId,
+        currentUser.name ??
+        session.user.name ??
+        session.user.email ??
+        currentUser.backendUserId,
       role: currentUser.role,
     },
     locationId: currentUser.preferredLocationId,

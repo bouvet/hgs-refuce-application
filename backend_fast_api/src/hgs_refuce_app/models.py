@@ -38,6 +38,7 @@ class User(BaseModel):
     id: str
     isAdmin: bool
     isSuperAdmin: bool = False
+    name: Optional[str] = None
 
 
 class CurrentUser(BaseModel):
@@ -48,6 +49,7 @@ class CurrentUser(BaseModel):
     """
     backendUserId: str
     role: str = Field(..., description="user | admin | superadmin")
+    name: Optional[str] = None
     locations: List[Location]
     preferredLocationId: Optional[str] = None
 
@@ -91,12 +93,24 @@ class CreateUserRequest(BaseModel):
 
     - `password` present  → PIN user; `id` must look like a username (no `@`).
     - `password` absent   → SSO user; `id` must look like an email (contains `@`).
-    - `name` is metadata only — not persisted in v1.
+    - `name` is persisted on the `users` row (optional display name).
     """
     id: str
     isAdmin: bool = False
     password: Optional[str] = None
     name: Optional[str] = None
+
+
+class UpdateUserRequest(BaseModel):
+    """Payload for `PUT /users/{user_id}`. All fields optional (PATCH semantics).
+
+    Only the caller's authority decides which fields are accepted: regular
+    admins may only change `name`; only superadmins may toggle `isAdmin` or
+    `isSuperAdmin`. The backend enforces this — see `main.py`.
+    """
+    name: Optional[str] = None
+    isAdmin: Optional[bool] = None
+    isSuperAdmin: Optional[bool] = None
 
 
 class LoginRequest(BaseModel):

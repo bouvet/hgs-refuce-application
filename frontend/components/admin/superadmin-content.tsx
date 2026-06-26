@@ -4,8 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { api } from "@/lib/api";
 import type { AdminUser, Location, PendingAccessRequest } from "@/lib/types";
-import { Plus, Trash2, ChevronDown, Check, X } from "lucide-react";
+import { Plus, Trash2, ChevronDown, Check, X, Pencil } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { EditUserDialog } from "@/components/admin/edit-user-dialog";
 
 type UserFormMode = "sso" | "pin";
 
@@ -45,6 +46,7 @@ export function SuperAdminContent() {
   );
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("brukere");
+  const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
 
   const userId = user?.id;
 
@@ -515,22 +517,58 @@ export function SuperAdminContent() {
               {!loadingUsers && users.length === 0 && (
                 <p className="text-muted-foreground">Ingen brukere funnet</p>
               )}
-              {users.map((u) => (
-                <div
-                  key={u.id}
-                  className="flex items-center justify-between p-3 rounded-lg border border-border bg-card"
-                >
-                  <span className="font-medium">{u.id}</span>
-                  {u.id !== "sadmin" && (
-                    <button
-                      onClick={() => deleteUser(u.id)}
-                      className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                  )}
-                </div>
-              ))}
+              {users.map((u) => {
+                const roleLabel = u.isSuperAdmin
+                  ? "Superadmin"
+                  : u.isAdmin
+                    ? "Admin"
+                    : "Bruker";
+                const roleClass = u.isSuperAdmin
+                  ? "bg-red-500/10 text-red-600 border-red-500/20"
+                  : u.isAdmin
+                    ? "bg-primary/10 text-primary border-primary/20"
+                    : "bg-muted text-muted-foreground border-border";
+                return (
+                  <div
+                    key={u.id}
+                    className="flex items-center justify-between gap-3 p-3 rounded-lg border border-border bg-card"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">
+                        {u.name || u.id}
+                      </div>
+                      {u.name && (
+                        <div className="text-sm text-muted-foreground truncate">
+                          {u.id}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span
+                        className={`px-2 py-0.5 rounded-full border text-xs font-medium ${roleClass}`}
+                      >
+                        {roleLabel}
+                      </span>
+                      <button
+                        onClick={() => setEditingUser(u)}
+                        className="p-2 hover:bg-accent rounded-lg transition-colors"
+                        title="Endre"
+                      >
+                        <Pencil className="size-4" />
+                      </button>
+                      {u.id !== "sadmin" && (
+                        <button
+                          onClick={() => deleteUser(u.id)}
+                          className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                          title="Slett"
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </TabsContent>
@@ -611,7 +649,7 @@ export function SuperAdminContent() {
                             <option value="">Velg bruker</option>
                             {users.map((u) => (
                               <option key={u.id} value={u.id}>
-                                {u.id}
+                                {u.name ? `${u.name} (${u.id})` : u.id}
                               </option>
                             ))}
                           </select>
@@ -716,6 +754,22 @@ export function SuperAdminContent() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {editingUser && (
+        <EditUserDialog
+          user={editingUser}
+          callerIsSuperAdmin={user?.role === "superadmin"}
+          callerId={userId ?? ""}
+          onClose={() => setEditingUser(null)}
+          onSaved={(updated) => {
+            setUsers((prev) =>
+              prev.map((u) => (u.id === updated.id ? updated : u)),
+            );
+            setSuccess(`Bruker ${updated.name || updated.id} oppdatert`);
+            setTimeout(() => setSuccess(""), 3000);
+          }}
+        />
+      )}
     </div>
   );
 }

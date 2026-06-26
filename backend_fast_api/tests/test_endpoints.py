@@ -595,3 +595,118 @@ def test_create_user_validation_rejects_short_pin():
         headers=_headers(TEST_ADMIN),
     )
     assert resp.status_code == 422
+
+
+# ---------- name persistence + currentUser ----------
+
+
+def test_create_sso_user_persists_name():
+    user_storage.create_user(TEST_ADMIN, is_admin=True)
+    resp = client.post(
+        "/users",
+        json={"id": "gina@bouvet.no", "isAdmin": False, "name": "Gina Test"},
+        headers=_headers(TEST_ADMIN),
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["name"] == "Gina Test"
+    # And round-trips via storage.
+    assert user_storage.get_user("gina@bouvet.no").name == "Gina Test"
+
+
+def test_current_user_response_includes_name():
+    user_storage.create_user("helen@bouvet.no", is_admin=False, name="Helen H")
+    resp = client.get("/currentUser", headers=_headers("helen@bouvet.no"))
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["name"] == "Helen H"
+
+
+# ---------- PUT /users/{user_id} ----------
+
+
+def test_update_user_name_as_admin_ok():
+    user_storage.create_user(TEST_ADMIN, is_admin=True)
+    user_storage.create_user("target@bouvet.no", is_admin=False, name="Old Name")
+    resp = client.put(
+        "/users/target@bouvet.no",
+        json={"name": "New Name"},
+        headers=_headers(TEST_ADMIN),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["name"] == "New Name"
+    assert user_storage.get_user("target@bouvet.no").name == "New Name"
+
+
+def test_update_user_isadmin_as_non_super_admin_forbidden():
+    user_storage.create_user(TEST_ADMIN, is_admin=True)
+    user_storage.create_user("target@bouvet.no", is_admin=False)
+    resp = client.put(
+        "/users/target@bouvet.no",
+        json={"isAdmin": True},
+        headers=_headers(TEST_ADMIN),
+    )
+    assert resp.status_code == 403
+    # Row unchanged.
+    assert user_storage.get_user("target@bouvet.no").isAdmin is False
+
+
+def test_update_user_isadmin_as_super_admin_ok():
+    _seed_superadmin()
+    user_storage.create_user("target@bouvet.no", is_admin=False)
+    resp = client.put(
+        "/users/target@bouvet.no",
+        json={"isAdmin": True},
+        headers=_headers(TEST_SUPERADMIN),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["isAdmin"] is True
+
+
+def test_update_user_promote_to_super_admin_as_super_admin_ok():
+    _seed_superadmin()
+    user_storage.create_user("target@bouvet.no", is_admin=True)
+    resp = client.put(
+        "/users/target@bouvet.no",
+        json={"isSuperAdmin": True},
+        headers=_headers(TEST_SUPERADMIN),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["isSuperAdmin"] is True
+    assert user_storage.count_super_admins() == 2
+
+
+def test_update_user_demote_last_super_admin_refused():
+    _seed_superadmin()
+    # Only TEST_SUPERADMIN is a superadmin.
+    resp = client.put(
+        f"/users/{TEST_SUPERADMIN}",
+        json={"isSuperAdmin": False},
+        headers=_headers(TEST_SUPERADMIN),
+    )
+    assert resp.status_code == 409
+    # Still superadmin.
+    assert user_storage.get_user(TEST_SUPERADMIN).isSuperAdmin is True
+
+
+def test_update_user_demote_super_admin_when_others_exist_ok():
+    _seed_superadmin()
+    user_storage.create_user("co-sadmin", is_admin=True, is_super_admin=True)
+    resp = client.put(
+        "/users/co-sadmin",
+        json={"isSuperAdmin": False},
+        headers=_headers(TEST_SUPERADMIN),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["isSuperAdmin"] is False
+    assert user_storage.count_super_admins() == 1
+
+
+def test_update_user_unknown_user_404():
+    user_storage.create_user(TEST_ADMIN, is_admin=True)
+    resp = client.put(
+        "/users/nobody@bouvet.no",
+        json={"name": "Ghost"},
+        headers=_headers(TEST_ADMIN),
+    )
+    assert resp.status_code == 404

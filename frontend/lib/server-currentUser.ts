@@ -22,6 +22,7 @@ export type CurrentUser = {
   role: Role;
   locations: CurrentUserLocation[];
   preferredLocationId: string | null;
+  name: string | null;
 };
 
 function normaliseRole(role: unknown): Role {
@@ -47,6 +48,7 @@ export const getCurrentUser = cache(
         role: normaliseRole(data.role),
         locations: Array.isArray(data.locations) ? data.locations : [],
         preferredLocationId: data.preferredLocationId ?? null,
+        name: typeof data.name === "string" ? data.name : null,
       };
     } catch {
       return null;
