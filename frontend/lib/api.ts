@@ -1,4 +1,9 @@
-import type { AdminUser, Location } from "@/lib/types";
+import type {
+  AdminUser,
+  CreateUserPayload,
+  Location,
+  PendingAccessRequest,
+} from "@/lib/types";
 
 /**
  * Browser-side API client. All requests go through the Next.js proxy at
@@ -84,13 +89,10 @@ export const api = {
     return request<AdminUser[]>("/users");
   },
 
-  createUser: async (
-    username: string,
-    isAdmin: boolean,
-  ): Promise<AdminUser> => {
+  createUser: async (payload: CreateUserPayload): Promise<AdminUser> => {
     return request<AdminUser>("/users", {
       method: "POST",
-      body: JSON.stringify({ id: username, isAdmin }),
+      body: JSON.stringify(payload),
     });
   },
 
@@ -124,5 +126,15 @@ export const api = {
     return request<string[]>(
       `/locations/${encodeURIComponent(locationId)}/users`,
     );
+  },
+
+  listAccessRequests: async (): Promise<PendingAccessRequest[]> => {
+    return request<PendingAccessRequest[]>("/admin/access-requests");
+  },
+
+  dismissAccessRequest: async (email: string): Promise<void> => {
+    await request<void>(`/admin/access-requests/${encodeURIComponent(email)}`, {
+      method: "DELETE",
+    });
   },
 };

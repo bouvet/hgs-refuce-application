@@ -2,7 +2,10 @@ export const dynamic = "force-dynamic";
 
 import { Leaf } from "lucide-react";
 import { requireSession, getBackendUserId } from "@/lib/server-session";
-import { getCurrentUser } from "@/lib/server-currentUser";
+import {
+  getCurrentUser,
+  resolveAndPersistBackendUserId,
+} from "@/lib/server-currentUser";
 import { LocationPicker } from "./location-picker";
 
 function CenteredNotice({
@@ -31,13 +34,25 @@ function CenteredNotice({
 
 export default async function SelectLocationPage() {
   const session = await requireSession("/select-location");
-  const backendUserId = getBackendUserId(session.user);
+  let backendUserId = getBackendUserId(session.user);
+
+  if (!backendUserId) {
+    // SSO user whose first sign-in happened before they were provisioned in
+    // the backend. The Better Auth create-hook only fires once, so retry the
+    // resolve here — if a superadmin has since approved them, this writes the
+    // backendUserId onto their BA row and the rest of the page works normally.
+    backendUserId = await resolveAndPersistBackendUserId({
+      baUserId: session.user.id,
+      email: session.user.email,
+      name: session.user.name ?? null,
+    });
+  }
 
   if (!backendUserId) {
     return (
       <CenteredNotice
-        title="Bruker ikke klargjort"
-        body="Brukeren din er ikke knyttet til en backend-konto. Kontakt en administrator for å bli lagt til."
+        title="Venter på godkjenning"
+        body="Din forespørsel om tilgang er sendt. En administrator må godkjenne deg før du kan logge inn. Prøv å oppdatere siden om litt."
       />
     );
   }

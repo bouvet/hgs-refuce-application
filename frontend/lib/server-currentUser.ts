@@ -10,7 +10,9 @@
  * Server-only: imports `backendFetch`, which uses `node:crypto`.
  */
 import { cache } from "react";
-import { backendFetch } from "@/lib/server-api";
+import { backendFetch, backendServiceFetch } from "@/lib/server-api";
+import { getPool } from "@/lib/auth";
+import type { SsoResolveResponse } from "@/lib/auth";
 
 export type Role = "user" | "admin" | "superadmin";
 export type CurrentUserLocation = { id: string; name: string };
@@ -51,3 +53,42 @@ export const getCurrentUser = cache(
     }
   },
 );
+
+/**
+ * Lazy re-resolution for SSO users that were `pending` at first sign-in.
+ *
+ * The Better Auth `user.create.before` hook only fires ONCE. If the user
+ * tried to sign in before a superadmin provisioned them, their BA row has
+ * `backendUserId = NULL` permanently — until we retry. This helper re-asks
+ * the backend and, on success, writes the id into the BA `"user"` table so
+ * subsequent requests see it on the session.
+ *
+ * Called from `/select-location` before deciding to show the
+ * "awaiting approval" notice.
+ */
+export async function resolveAndPersistBackendUserId(input: {
+  baUserId: string;
+  email: string;
+  name: string | null;
+}): Promise<string | null> {
+  try {
+    const resp = await backendServiceFetch("/auth/sso-resolve", {
+      method: "POST",
+      body: JSON.stringify({
+        email: input.email,
+        name: input.name ?? undefined,
+      }),
+    });
+    if (!resp.ok) return null;
+    const body = (await resp.json()) as SsoResolveResponse;
+    if (body.status !== "resolved") return null;
+
+    await getPool().query(
+      'UPDATE "user" SET "backendUserId" = $1 WHERE id = $2',
+      [body.backendUserId, input.baUserId],
+    );
+    return body.backendUserId;
+  } catch {
+    return null;
+  }
+}

@@ -21,6 +21,7 @@ from .models import (
     CurrentUser,
     SsoResolveRequest,
     SsoResolveResponse,
+    PendingAccessRequest,
     SetPreferredLocationRequest,
     CreateUserRequest,
     CreateLocationRequest,
@@ -177,14 +178,14 @@ def get_admin_secret(x_admin_secret: Optional[str] = Header(None)) -> str:
 
 
 def verify_service_auth(
-    x_user_sig_version: Optional[str] = Header(None),
-    x_user_sig_timestamp: Optional[str] = Header(None),
-    x_user_sig: Optional[str] = Header(None),
+    x_service_sig_version: Optional[str] = Header(None),
+    x_service_sig_timestamp: Optional[str] = Header(None),
+    x_service_sig: Optional[str] = Header(None),
 ) -> None:
-    if not x_user_sig_version or not x_user_sig_timestamp or not x_user_sig:
+    if not x_service_sig_version or not x_service_sig_timestamp or not x_service_sig:
         raise HTTPException(status_code=401, detail="Missing signature headers")
     try:
-        verify_service_hmac(x_user_sig, x_user_sig_timestamp, x_user_sig_version)
+        verify_service_hmac(x_service_sig, x_service_sig_timestamp, x_service_sig_version)
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
 
@@ -283,6 +284,28 @@ def admin_add_user_to_location(
     return {"detail": "User added to location"}
 
 
+# ---------- pending access requests (super-admin) ----------
+
+@app.get("/admin/access-requests", response_model=List[PendingAccessRequest])
+def list_access_requests(_: str = Depends(require_super_admin)):
+    return user_storage.list_pending_requests()
+
+
+@app.delete(
+    "/admin/access-requests/{email}",
+    status_code=204,
+    response_class=Response,
+)
+def delete_access_request(
+    email: str,
+    _: str = Depends(require_super_admin),
+):
+    if not user_storage.delete_pending_request(email):
+        raise HTTPException(status_code=404, detail="Pending request not found")
+    logger.info("dismissed pending access request for %s", email)
+    return Response(status_code=204)
+
+
 # ---------- auth endpoints ----------
 
 @app.post("/auth/login", response_model=LoginResponse)
@@ -314,14 +337,20 @@ def sso_resolve(
     req: SsoResolveRequest,
     _: None = Depends(verify_service_auth),
 ):
-    # Map an Entra email to a backend user. Backend users must be provisioned
-    # by an admin before they can sign in via SSO. This endpoint is called by
-    # Better Auth's user-create hook during the first SSO sign-in.
+    # Map an Entra email to a backend user. If the email is unknown, queue
+    # the attempt as a pending access request so a superadmin can approve or
+    # dismiss it from the admin panel. Always returns 200; the frontend reads
+    # `status` to decide whether to persist `backendUserId` on the BA user.
     user = user_storage.get_user(req.email)
-    if not user:
-        logger.warning("sso_resolve: user not found for email %s", req.email)
-        raise HTTPException(status_code=404, detail="User not provisioned")
-    return SsoResolveResponse(backendUserId=user.id, role=_role_for(user))
+    if user:
+        return SsoResolveResponse(
+            status="resolved",
+            backendUserId=user.id,
+            role=_role_for(user),
+        )
+    logger.info("sso_resolve: queuing pending access request for %s", req.email)
+    user_storage.upsert_pending_request(req.email, req.name)
+    return SsoResolveResponse(status="pending")
 
 
 # ---------- current user ----------
@@ -398,9 +427,36 @@ def create_user_as_admin(
     req: CreateUserRequest,
     _: str = Depends(require_admin)
 ):
+    # Validate the id/password combination matches one of the two supported
+    # provisioning modes. The admin UI enforces this client-side too, but the
+    # backend is the authority — reject mismatches with 422 so a misbehaving
+    # client can't create an SSO user with a password (or vice versa).
+    has_at = "@" in req.id
+    if req.password is not None:
+        if has_at:
+            raise HTTPException(
+                status_code=422,
+                detail="PIN-brukere skal ha et brukernavn uten '@'.",
+            )
+        if len(req.password) < 4:
+            raise HTTPException(
+                status_code=422,
+                detail="PIN m\u00e5 v\u00e6re minst 4 tegn.",
+            )
+    else:
+        if not has_at:
+            raise HTTPException(
+                status_code=422,
+                detail="SSO-brukere m\u00e5 opprettes med en e-postadresse.",
+            )
     if user_storage.user_exists(req.id):
         raise HTTPException(status_code=409, detail="User already exists")
-    user_storage.create_user(req.id, req.isAdmin)
+    user_storage.create_user(req.id, req.isAdmin, password=req.password)
+    # If we just provisioned an SSO user, clear any pending access request
+    # for the same email so the inbox stays tidy. PIN users never have a
+    # matching pending row (those are always emails).
+    if req.password is None:
+        user_storage.delete_pending_request(req.id)
     return User(id=req.id, isAdmin=req.isAdmin, isSuperAdmin=False)
 
 

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 
 class WasteCategoryEntry(BaseModel):
@@ -58,8 +58,24 @@ class SsoResolveRequest(BaseModel):
 
 
 class SsoResolveResponse(BaseModel):
-    backendUserId: str
-    role: str
+    """Result of looking up an SSO email on the backend.
+
+    `status` is the discriminator. On `resolved`, `backendUserId` and `role`
+    are populated. On `pending`, the email was unknown to the backend and a
+    row was upserted into `pending_access_requests` for admin review; the
+    frontend should keep the Better Auth user without a `backendUserId` so a
+    subsequent visit can lazy-resolve once the admin provisions the account.
+    """
+    status: Literal["resolved", "pending"]
+    backendUserId: Optional[str] = None
+    role: Optional[str] = None
+
+
+class PendingAccessRequest(BaseModel):
+    email: str
+    name: Optional[str] = None
+    requestedAt: str
+    lastAttemptAt: str
 
 
 class SetPreferredLocationRequest(BaseModel):
@@ -71,8 +87,16 @@ class LocationUserEntry(BaseModel):
 
 
 class CreateUserRequest(BaseModel):
+    """Payload for `POST /users`.
+
+    - `password` present  → PIN user; `id` must look like a username (no `@`).
+    - `password` absent   → SSO user; `id` must look like an email (contains `@`).
+    - `name` is metadata only — not persisted in v1.
+    """
     id: str
     isAdmin: bool = False
+    password: Optional[str] = None
+    name: Optional[str] = None
 
 
 class LoginRequest(BaseModel):

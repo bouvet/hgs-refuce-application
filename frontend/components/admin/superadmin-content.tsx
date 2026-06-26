@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { api } from "@/lib/api";
-import type { AdminUser, Location } from "@/lib/types";
-import { Plus, Trash2, ChevronDown } from "lucide-react";
+import type { AdminUser, Location, PendingAccessRequest } from "@/lib/types";
+import { Plus, Trash2, ChevronDown, Check, X } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+
+type UserFormMode = "sso" | "pin";
 
 export function SuperAdminContent() {
   const { user } = useCurrentUser();
@@ -16,8 +18,20 @@ export function SuperAdminContent() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const [newUserEmail, setNewUserEmail] = useState("");
+  // Create-user form: two distinct modes share a single "isAdmin" toggle but
+  // otherwise own their own input state so flipping mode never leaks values
+  // from one shape into the other.
+  const [userMode, setUserMode] = useState<UserFormMode>("sso");
   const [newUserIsAdmin, setNewUserIsAdmin] = useState(false);
+  const [newSsoFirstName, setNewSsoFirstName] = useState("");
+  const [newSsoLastName, setNewSsoLastName] = useState("");
+  const [newSsoEmail, setNewSsoEmail] = useState("");
+  const [newPinUsername, setNewPinUsername] = useState("");
+  const [newPinPassword, setNewPinPassword] = useState("");
+  // When approving a pending access request we pre-fill the SSO form and lock
+  // the email field so the admin can't accidentally rename them.
+  const [emailLocked, setEmailLocked] = useState(false);
+
   const [newLocName, setNewLocName] = useState("");
   const [selectedLocForUser, setSelectedLocForUser] = useState("");
   const [selectedUserForLoc, setSelectedUserForLoc] = useState("");
@@ -26,7 +40,30 @@ export function SuperAdminContent() {
   );
   const [expandedLoc, setExpandedLoc] = useState<string | null>(null);
 
+  const [accessRequests, setAccessRequests] = useState<PendingAccessRequest[]>(
+    [],
+  );
+  const [loadingRequests, setLoadingRequests] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("brukere");
+
   const userId = user?.id;
+
+  const fetchAccessRequests = useCallback(async () => {
+    if (!userId) return;
+    try {
+      setLoadingRequests(true);
+      const list = await api.listAccessRequests();
+      setAccessRequests(list);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Klarte ikke å hente tilgangsforespørsler",
+      );
+    } finally {
+      setLoadingRequests(false);
+    }
+  }, [userId]);
 
   useEffect(() => {
     if (!userId) return;
@@ -58,7 +95,8 @@ export function SuperAdminContent() {
         setLoadingUsers(false);
       }
     })();
-  }, [userId]);
+    fetchAccessRequests();
+  }, [userId, fetchAccessRequests]);
 
   async function fetchLocations() {
     if (!userId) return;
@@ -105,21 +143,120 @@ export function SuperAdminContent() {
   }
 
   async function createUser() {
-    if (!newUserEmail.trim() || !userId) return;
+    if (!userId) return;
+    setError("");
+
+    // Build the payload from the active mode and validate client-side. The
+    // backend re-validates (and is the authority) but we want to give a fast
+    // friendly error instead of round-tripping a 422.
+    if (userMode === "sso") {
+      const email = newSsoEmail.trim().toLowerCase();
+      const firstName = newSsoFirstName.trim();
+      const lastName = newSsoLastName.trim();
+      if (!email) {
+        setError("E-postadresse er p\u00e5krevd.");
+        return;
+      }
+      if (!email.includes("@")) {
+        setError("E-postadressen m\u00e5 inneholde '@'.");
+        return;
+      }
+      const name = `${firstName} ${lastName}`.trim() || undefined;
+      try {
+        setLoadingUsers(true);
+        await api.createUser({ id: email, isAdmin: newUserIsAdmin, name });
+        setNewSsoFirstName("");
+        setNewSsoLastName("");
+        setNewSsoEmail("");
+        setNewUserIsAdmin(false);
+        setEmailLocked(false);
+        setSuccess("SSO-bruker opprettet");
+        await Promise.all([fetchUsers(), fetchAccessRequests()]);
+        setTimeout(() => setSuccess(""), 3000);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Klarte ikke \u00e5 opprette bruker",
+        );
+      } finally {
+        setLoadingUsers(false);
+      }
+      return;
+    }
+
+    const username = newPinUsername.trim();
+    const password = newPinPassword;
+    if (!username) {
+      setError("Brukernavn er p\u00e5krevd.");
+      return;
+    }
+    if (username.includes("@")) {
+      setError("PIN-brukernavn kan ikke inneholde '@'.");
+      return;
+    }
+    if (password.length < 4) {
+      setError("PIN m\u00e5 v\u00e6re minst 4 tegn.");
+      return;
+    }
     try {
       setLoadingUsers(true);
-      await api.createUser(newUserEmail.trim(), newUserIsAdmin);
-      setNewUserEmail("");
+      await api.createUser({
+        id: username,
+        isAdmin: newUserIsAdmin,
+        password,
+      });
+      setNewPinUsername("");
+      setNewPinPassword("");
       setNewUserIsAdmin(false);
-      setSuccess("Bruker opprettet");
+      setSuccess("PIN-bruker opprettet");
       await fetchUsers();
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Klarte ikke å opprette bruker",
+        err instanceof Error
+          ? err.message
+          : "Klarte ikke \u00e5 opprette bruker",
       );
     } finally {
       setLoadingUsers(false);
+    }
+  }
+
+  function approveAccessRequest(req: PendingAccessRequest) {
+    // Switch into SSO mode, prefill from the request, lock the email field,
+    // and bounce to the Brukere tab. The actual creation is the same code path
+    // as any SSO user; on success the matching pending row is cleared backend-
+    // side and we refetch the access-request list.
+    setUserMode("sso");
+    setNewSsoEmail(req.email);
+    if (req.name) {
+      const parts = req.name.trim().split(/\s+/);
+      setNewSsoFirstName(parts[0] ?? "");
+      setNewSsoLastName(parts.slice(1).join(" "));
+    } else {
+      setNewSsoFirstName("");
+      setNewSsoLastName("");
+    }
+    setNewUserIsAdmin(false);
+    setEmailLocked(true);
+    setActiveTab("brukere");
+  }
+
+  async function dismissAccessRequest(email: string) {
+    if (!userId) return;
+    if (!confirm(`Avvis tilgangsforesp\u00f8rsel fra ${email}?`)) return;
+    try {
+      await api.dismissAccessRequest(email);
+      setSuccess("Foresp\u00f8rsel avvist");
+      await fetchAccessRequests();
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Klarte ikke \u00e5 avvise foresp\u00f8rsel",
+      );
     }
   }
 
@@ -236,39 +373,140 @@ export function SuperAdminContent() {
         </div>
       )}
 
-      <Tabs defaultValue="brukere">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="brukere">Brukere</TabsTrigger>
           <TabsTrigger value="lokasjoner">Lokasjoner</TabsTrigger>
+          <TabsTrigger value="forespoersler">
+            Tilgangsforespørsler
+            {accessRequests.length > 0 && (
+              <span className="ml-2 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-xs px-2 py-0.5 min-w-[1.25rem]">
+                {accessRequests.length}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="brukere" className="mt-6">
           <div className="space-y-4">
-            <div className="flex gap-2">
-              <input
-                type="email"
-                value={newUserEmail}
-                onChange={(e) => setNewUserEmail(e.target.value)}
-                placeholder="E-post (f.eks. bruker@bouvet.no)"
-                className="flex-1 px-4 py-2 rounded-lg border border-border bg-card outline-none focus:border-primary"
-              />
-              <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card cursor-pointer hover:bg-accent">
-                <input
-                  type="checkbox"
-                  checked={newUserIsAdmin}
-                  onChange={(e) => setNewUserIsAdmin(e.target.checked)}
-                />
-                <span className="text-sm">Admin</span>
-              </label>
+            <div className="flex gap-2 text-sm">
               <button
-                onClick={createUser}
-                disabled={!newUserEmail.trim() || loadingUsers}
-                className="px-4 py-2 rounded-lg bg-primary text-white font-semibold disabled:opacity-50 disabled:cursor-default flex items-center gap-2"
+                type="button"
+                onClick={() => {
+                  setUserMode("sso");
+                  setEmailLocked(false);
+                  setError("");
+                }}
+                className={`px-3 py-1.5 rounded-lg border transition-colors ${
+                  userMode === "sso"
+                    ? "bg-primary text-white border-primary"
+                    : "border-border bg-card hover:bg-accent"
+                }`}
               >
-                <Plus className="size-4" />
-                Opprett bruker
+                SSO-bruker (Microsoft)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setUserMode("pin");
+                  setEmailLocked(false);
+                  setError("");
+                }}
+                className={`px-3 py-1.5 rounded-lg border transition-colors ${
+                  userMode === "pin"
+                    ? "bg-primary text-white border-primary"
+                    : "border-border bg-card hover:bg-accent"
+                }`}
+              >
+                PIN-bruker
               </button>
             </div>
+
+            {userMode === "sso" ? (
+              <div className="space-y-2 p-4 rounded-lg border border-border bg-card/50">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={newSsoFirstName}
+                    onChange={(e) => setNewSsoFirstName(e.target.value)}
+                    placeholder="Fornavn"
+                    className="px-4 py-2 rounded-lg border border-border bg-card outline-none focus:border-primary"
+                  />
+                  <input
+                    type="text"
+                    value={newSsoLastName}
+                    onChange={(e) => setNewSsoLastName(e.target.value)}
+                    placeholder="Etternavn"
+                    className="px-4 py-2 rounded-lg border border-border bg-card outline-none focus:border-primary"
+                  />
+                </div>
+                <input
+                  type="email"
+                  value={newSsoEmail}
+                  onChange={(e) => setNewSsoEmail(e.target.value)}
+                  placeholder="E-postadresse (f.eks. bruker@bouvet.no)"
+                  disabled={emailLocked}
+                  className="w-full px-4 py-2 rounded-lg border border-border bg-card outline-none focus:border-primary disabled:opacity-60 disabled:cursor-not-allowed"
+                />
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card cursor-pointer hover:bg-accent">
+                    <input
+                      type="checkbox"
+                      checked={newUserIsAdmin}
+                      onChange={(e) => setNewUserIsAdmin(e.target.checked)}
+                    />
+                    <span className="text-sm">Admin</span>
+                  </label>
+                  <button
+                    onClick={createUser}
+                    disabled={!newSsoEmail.trim() || loadingUsers}
+                    className="px-4 py-2 rounded-lg bg-primary text-white font-semibold disabled:opacity-50 disabled:cursor-default flex items-center gap-2"
+                  >
+                    <Plus className="size-4" />
+                    Opprett SSO-bruker
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2 p-4 rounded-lg border border-border bg-card/50">
+                <input
+                  type="text"
+                  value={newPinUsername}
+                  onChange={(e) => setNewPinUsername(e.target.value)}
+                  placeholder="Brukernavn (uten '@')"
+                  className="w-full px-4 py-2 rounded-lg border border-border bg-card outline-none focus:border-primary"
+                />
+                <input
+                  type="text"
+                  value={newPinPassword}
+                  onChange={(e) => setNewPinPassword(e.target.value)}
+                  placeholder="Initial PIN (minst 4 tegn)"
+                  className="w-full px-4 py-2 rounded-lg border border-border bg-card outline-none focus:border-primary"
+                />
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card cursor-pointer hover:bg-accent">
+                    <input
+                      type="checkbox"
+                      checked={newUserIsAdmin}
+                      onChange={(e) => setNewUserIsAdmin(e.target.checked)}
+                    />
+                    <span className="text-sm">Admin</span>
+                  </label>
+                  <button
+                    onClick={createUser}
+                    disabled={
+                      !newPinUsername.trim() ||
+                      newPinPassword.length < 4 ||
+                      loadingUsers
+                    }
+                    className="px-4 py-2 rounded-lg bg-primary text-white font-semibold disabled:opacity-50 disabled:cursor-default flex items-center gap-2"
+                  >
+                    <Plus className="size-4" />
+                    Opprett PIN-bruker
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               {loadingUsers && (
@@ -425,6 +663,56 @@ export function SuperAdminContent() {
                 </div>
               ))}
             </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="forespoersler" className="mt-6">
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              SSO-pålogginger fra ukjente e-postadresser havner her. Godkjenn
+              for å opprette en backend-bruker, eller avvis for å fjerne
+              forespørselen.
+            </p>
+
+            {loadingRequests && (
+              <p className="text-muted-foreground">Laster forespørsler…</p>
+            )}
+            {!loadingRequests && accessRequests.length === 0 && (
+              <p className="text-muted-foreground">
+                Ingen ventende forespørsler
+              </p>
+            )}
+
+            {accessRequests.map((req) => (
+              <div
+                key={req.email}
+                className="flex items-center justify-between gap-3 p-3 rounded-lg border border-border bg-card"
+              >
+                <div className="min-w-0">
+                  <div className="font-medium truncate">{req.email}</div>
+                  <div className="text-sm text-muted-foreground truncate">
+                    {req.name ?? "Ukjent navn"} · sist forsøk{" "}
+                    {new Date(req.lastAttemptAt).toLocaleString("nb-NO")}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => approveAccessRequest(req)}
+                    className="px-3 py-1.5 rounded-lg bg-primary text-white text-sm font-semibold flex items-center gap-1.5 hover:opacity-90"
+                  >
+                    <Check className="size-4" />
+                    Godkjenn
+                  </button>
+                  <button
+                    onClick={() => dismissAccessRequest(req.email)}
+                    className="px-3 py-1.5 rounded-lg border border-border text-sm flex items-center gap-1.5 hover:bg-accent"
+                  >
+                    <X className="size-4" />
+                    Avvis
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </TabsContent>
       </Tabs>

@@ -29,16 +29,24 @@ import { backendServiceFetch } from "@/lib/server-api";
 // The backend confirms the Entra user exists and returns its stable identity.
 // `role` is returned too but intentionally NOT persisted here — the backend
 // stays the source of truth and is queried for it on demand.
-type SsoResolveResponse = {
-  backendUserId: string;
-  role: "user" | "admin" | "superadmin";
-};
+//
+// If the user is unknown to the backend, the response carries `pending`. The
+// backend queues a pending access request for a superadmin to approve, and we
+// let the user finish creating a Better Auth row WITHOUT a `backendUserId`.
+// They land on `/select-location`, which shows a “awaiting approval” notice.
+export type SsoResolveResponse =
+  | {
+      status: "resolved";
+      backendUserId: string;
+      role: "user" | "admin" | "superadmin";
+    }
+  | { status: "pending" };
 
 declare global {
   var __betterAuthPgPool: Pool | undefined;
 }
 
-function getPool(): Pool {
+export function getPool(): Pool {
   if (!globalThis.__betterAuthPgPool) {
     globalThis.__betterAuthPgPool = new Pool({
       connectionString: authEnv.databaseURL,
@@ -99,18 +107,22 @@ function createAuth() {
       user: {
         create: {
           before: async (user) => {
-            // Brand-new SSO user: verify they exist in the backend and capture
-            // their stable backend id. We do NOT pull role/location here — those
-            // are fetched live from the backend (lib/server-currentUser.ts) so they can
-            // never go stale.
+            // Brand-new SSO user: ask the backend whether this email maps to a
+            // provisioned user. On "resolved" we capture the stable backend id.
+            // On "pending" (or transport failure) we still create the Better Auth
+            // row, but without a backendUserId — the user lands on /select-location
+            // which shows an "awaiting approval" notice and lazily retries the
+            // resolve until a superadmin provisions them.
             const resolved = await resolveSsoUser({
               email: user.email,
               name: user.name,
             });
-            if (!resolved) return { data: user };
-            return {
-              data: { ...user, backendUserId: resolved.backendUserId },
-            };
+            if (resolved && resolved.status === "resolved") {
+              return {
+                data: { ...user, backendUserId: resolved.backendUserId },
+              };
+            }
+            return { data: user };
           },
         },
       },
