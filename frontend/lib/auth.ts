@@ -138,6 +138,14 @@ function createAuth() {
     advanced: {
       cookiePrefix: "avfall",
       useSecureCookies: process.env.NODE_ENV === "production",
+      // Azure App Service terminates TLS at its front-end and forwards the
+      // original client IP via `X-Forwarded-For`. Without this, Better Auth
+      // can't identify clients and rate limiting falls back to a single shared
+      // bucket per path. Only safe because App Service is the only thing that
+      // can set this header on requests reaching our container.
+      ipAddress: {
+        ipAddressHeaders: ["x-forwarded-for"],
+      },
     },
 
     trustedOrigins: [authEnv.baseURL],
