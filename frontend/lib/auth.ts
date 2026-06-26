@@ -150,6 +150,12 @@ function createAuth() {
     advanced: {
       cookiePrefix: "avfall",
       useSecureCookies: process.env.NODE_ENV === "production",
+      // Azure App Service / Front Door terminate TLS in front of Next.js and
+      // forward the original client IP in `x-forwarded-for`. Without this,
+      // rate-limit buckets collapse to a single shared key per path.
+      ipAddress: {
+        ipAddressHeaders: ["x-forwarded-for"],
+      },
     },
 
     trustedOrigins: [authEnv.baseURL],
