@@ -16,7 +16,7 @@ export function SuperAdminContent() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const [newUsername, setNewUsername] = useState("");
+  const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserIsAdmin, setNewUserIsAdmin] = useState(false);
   const [newLocName, setNewLocName] = useState("");
   const [selectedLocForUser, setSelectedLocForUser] = useState("");
@@ -105,11 +105,11 @@ export function SuperAdminContent() {
   }
 
   async function createUser() {
-    if (!newUsername.trim() || !userId) return;
+    if (!newUserEmail.trim() || !userId) return;
     try {
       setLoadingUsers(true);
-      await api.createUser(newUsername.trim(), newUserIsAdmin);
-      setNewUsername("");
+      await api.createUser(newUserEmail.trim(), newUserIsAdmin);
+      setNewUserEmail("");
       setNewUserIsAdmin(false);
       setSuccess("Bruker opprettet");
       await fetchUsers();
@@ -246,10 +246,10 @@ export function SuperAdminContent() {
           <div className="space-y-4">
             <div className="flex gap-2">
               <input
-                type="text"
-                value={newUsername}
-                onChange={(e) => setNewUsername(e.target.value)}
-                placeholder="Brukernavn"
+                type="email"
+                value={newUserEmail}
+                onChange={(e) => setNewUserEmail(e.target.value)}
+                placeholder="E-post (f.eks. bruker@bouvet.no)"
                 className="flex-1 px-4 py-2 rounded-lg border border-border bg-card outline-none focus:border-primary"
               />
               <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card cursor-pointer hover:bg-accent">
@@ -262,7 +262,7 @@ export function SuperAdminContent() {
               </label>
               <button
                 onClick={createUser}
-                disabled={!newUsername.trim() || loadingUsers}
+                disabled={!newUserEmail.trim() || loadingUsers}
                 className="px-4 py-2 rounded-lg bg-primary text-white font-semibold disabled:opacity-50 disabled:cursor-default flex items-center gap-2"
               >
                 <Plus className="size-4" />

@@ -41,34 +41,41 @@ async def lifespan(_: FastAPI):
     if not user_storage.list_locations():
         logger.info("initializing with demo data")
         bouvet_id = user_storage.create_location("Bouvet Office")
-        user_storage.create_user("common", is_admin=False, password="common")
-        user_storage.create_user("admin", is_admin=True, password="admin")
-        user_storage.add_user_to_location(bouvet_id, "common")
-        user_storage.add_user_to_location(bouvet_id, "admin")
-    # Create super-admin user if it doesn't exist
+        user_storage.create_user("common@example.com", is_admin=False, password="common")
+        user_storage.create_user("admin@example.com", is_admin=True, password="admin")
+        user_storage.add_user_to_location(bouvet_id, "common@example.com")
+        user_storage.add_user_to_location(bouvet_id, "admin@example.com")
+    # Create super-admin user if it doesn't exist (keeping legacy name for PIN login)
     if not user_storage.user_exists("sadmin"):
         logger.info("creating super-admin user")
         user_storage.create_user("sadmin", is_admin=True, password="sadmin", is_super_admin=True)
+    # Also create an email-based superadmin for SSO testing
+    sadmin_email = "sadmin@example.com"
+    if not user_storage.user_exists(sadmin_email):
+        logger.info("creating email-based super-admin user")
+        user_storage.create_user(sadmin_email, is_admin=True, password="", is_super_admin=True)
     # Ensure Haugesund demo data
     haugesund = user_storage.get_location_by_name("Haugesund")
     if not haugesund:
         haugesund_id = user_storage.create_location("Haugesund")
     else:
         haugesund_id = haugesund.id
-    if not user_storage.user_exists("haugesundUser"):
-        user_storage.create_user("haugesundUser", is_admin=False, password="123")
-    if not user_storage.location_has_access(haugesund_id, "haugesundUser"):
-        user_storage.add_user_to_location(haugesund_id, "haugesundUser")
+    haugesund_email = "haugesund@example.com"
+    if not user_storage.user_exists(haugesund_email):
+        user_storage.create_user(haugesund_email, is_admin=False, password="123")
+    if not user_storage.location_has_access(haugesund_id, haugesund_email):
+        user_storage.add_user_to_location(haugesund_id, haugesund_email)
     # Ensure Stavanger demo data
     stavanger = user_storage.get_location_by_name("Stavanger")
     if not stavanger:
         stavanger_id = user_storage.create_location("Stavanger")
     else:
         stavanger_id = stavanger.id
-    if not user_storage.user_exists("stavangerUser"):
-        user_storage.create_user("stavangerUser", is_admin=False, password="123")
-    if not user_storage.location_has_access(stavanger_id, "stavangerUser"):
-        user_storage.add_user_to_location(stavanger_id, "stavangerUser")
+    stavanger_email = "stavanger@example.com"
+    if not user_storage.user_exists(stavanger_email):
+        user_storage.create_user(stavanger_email, is_admin=False, password="123")
+    if not user_storage.location_has_access(stavanger_id, stavanger_email):
+        user_storage.add_user_to_location(stavanger_id, stavanger_email)
     try:
         yield
     finally:
