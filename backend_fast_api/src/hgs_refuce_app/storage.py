@@ -53,6 +53,15 @@ class DatabaseConnection:
                 # Column already exists or other error - safe to ignore
                 pass
 
+            # Migration: add name column for the optional admin-set display
+            # name. Same pattern as preferred_location_id above.
+            try:
+                with self.engine.connect() as migration_conn:
+                    migration_conn.execute(text("ALTER TABLE users ADD COLUMN name TEXT"))
+                    migration_conn.commit()
+            except Exception:
+                pass
+
             # Create locations table
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS locations (
@@ -137,18 +146,19 @@ class UserStorage:
     def _get_session(self):
         return self.SessionLocal()
 
-    def create_user(self, user_id: str, is_admin: bool, password: Optional[str] = None, is_super_admin: bool = False) -> None:
+    def create_user(self, user_id: str, is_admin: bool, password: Optional[str] = None, is_super_admin: bool = False, name: Optional[str] = None) -> None:
         with self.engine.connect() as conn:
             created_at = datetime.utcnow().isoformat()
             conn.execute(text("""
-                INSERT INTO users (id, is_admin, is_super_admin, password, created_at)
-                VALUES (:id, :is_admin, :is_super_admin, :password, :created_at)
+                INSERT INTO users (id, is_admin, is_super_admin, password, created_at, name)
+                VALUES (:id, :is_admin, :is_super_admin, :password, :created_at, :name)
             """), {
                 "id": user_id,
                 "is_admin": 1 if is_admin else 0,
                 "is_super_admin": 1 if is_super_admin else 0,
                 "password": password,
-                "created_at": created_at
+                "created_at": created_at,
+                "name": name,
             })
             conn.commit()
             logger.debug("created user %s (is_admin=%s, is_super_admin=%s)", user_id, is_admin, is_super_admin)
@@ -156,11 +166,11 @@ class UserStorage:
     def get_user(self, user_id: str) -> Optional[User]:
         with self.engine.connect() as conn:
             result = conn.execute(text("""
-                SELECT id, is_admin, is_super_admin FROM users WHERE id = :id
+                SELECT id, is_admin, is_super_admin, name FROM users WHERE id = :id
             """), {"id": user_id})
             row = result.fetchone()
             if row:
-                return User(id=row[0], isAdmin=bool(row[1]), isSuperAdmin=bool(row[2]))
+                return User(id=row[0], isAdmin=bool(row[1]), isSuperAdmin=bool(row[2]), name=row[3])
         return None
 
     def user_exists(self, user_id: str) -> bool:
@@ -176,11 +186,44 @@ class UserStorage:
 
     def list_users(self) -> List[User]:
         with self.engine.connect() as conn:
-            result = conn.execute(text("SELECT id, is_admin, is_super_admin FROM users ORDER BY id"))
+            result = conn.execute(text("SELECT id, is_admin, is_super_admin, name FROM users ORDER BY id"))
             return [
-                User(id=row[0], isAdmin=bool(row[1]), isSuperAdmin=bool(row[2]))
+                User(id=row[0], isAdmin=bool(row[1]), isSuperAdmin=bool(row[2]), name=row[3])
                 for row in result.fetchall()
             ]
+
+    def update_user(self, user_id: str, **fields) -> Optional[User]:
+        """Patch a user row. Only keys present in `fields` are written.
+
+        Accepts the snake_case column names: `name`, `is_admin`, `is_super_admin`.
+        Boolean values are coerced to 0/1. Returns the refreshed row, or None
+        if the user was deleted between the existence check and this call.
+        """
+        allowed = {"name", "is_admin", "is_super_admin"}
+        sets: List[str] = []
+        params: dict = {"id": user_id}
+        for key, value in fields.items():
+            if key not in allowed:
+                raise ValueError(f"update_user: field {key!r} is not updatable")
+            if key in ("is_admin", "is_super_admin"):
+                value = 1 if value else 0
+            sets.append(f"{key} = :{key}")
+            params[key] = value
+        if not sets:
+            return self.get_user(user_id)
+        with self.engine.connect() as conn:
+            conn.execute(
+                text(f"UPDATE users SET {', '.join(sets)} WHERE id = :id"),
+                params,
+            )
+            conn.commit()
+        return self.get_user(user_id)
+
+    def count_super_admins(self) -> int:
+        with self.engine.connect() as conn:
+            result = conn.execute(text("SELECT COUNT(*) FROM users WHERE is_super_admin = 1"))
+            row = result.fetchone()
+            return int(row[0]) if row else 0
 
     def delete_user(self, user_id: str) -> None:
         with self.engine.connect() as conn:

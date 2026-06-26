@@ -24,6 +24,7 @@ from .models import (
     PendingAccessRequest,
     SetPreferredLocationRequest,
     CreateUserRequest,
+    UpdateUserRequest,
     CreateLocationRequest,
     LocationUserEntry,
     LoginRequest,
@@ -368,6 +369,7 @@ def get_current_user(user_id: str = Depends(get_user_id)):
     return CurrentUser(
         backendUserId=user.id,
         role=_role_for(user),
+        name=user.name,
         locations=locations,
         preferredLocationId=preferred,
     )
@@ -451,13 +453,13 @@ def create_user_as_admin(
             )
     if user_storage.user_exists(req.id):
         raise HTTPException(status_code=409, detail="User already exists")
-    user_storage.create_user(req.id, req.isAdmin, password=req.password)
+    user_storage.create_user(req.id, req.isAdmin, password=req.password, name=req.name)
     # If we just provisioned an SSO user, clear any pending access request
     # for the same email so the inbox stays tidy. PIN users never have a
     # matching pending row (those are always emails).
     if req.password is None:
         user_storage.delete_pending_request(req.id)
-    return User(id=req.id, isAdmin=req.isAdmin, isSuperAdmin=False)
+    return User(id=req.id, isAdmin=req.isAdmin, isSuperAdmin=False, name=req.name)
 
 
 @app.delete("/users/{user_id}", status_code=204, response_class=Response)
@@ -471,6 +473,59 @@ def delete_user_endpoint(
         raise HTTPException(status_code=404, detail="User not found")
     user_storage.delete_user(user_id)
     return Response(status_code=204)
+
+
+@app.put("/users/{user_id}", response_model=User)
+def update_user_endpoint(
+    user_id: str,
+    req: UpdateUserRequest,
+    caller_id: str = Depends(require_admin),
+):
+    # PATCH semantics: only fields present in the request body are touched.
+    # Authorisation: any admin may edit `name`; only superadmins may toggle
+    # the role flags. Last-superadmin demotion is refused to prevent the org
+    # from locking itself out.
+    target = user_storage.get_user(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    changes = req.model_dump(exclude_unset=True)
+    touches_role = "isAdmin" in changes or "isSuperAdmin" in changes
+
+    if touches_role:
+        caller = user_storage.get_user(caller_id)
+        if not caller or not caller.isSuperAdmin:
+            raise HTTPException(
+                status_code=403,
+                detail="Bare superadmin kan endre rolle.",
+            )
+
+    # Guard against demoting the last remaining superadmin. Applies whether
+    # the caller flips `isSuperAdmin` directly or sets `isAdmin=False` on a
+    # row that is also a superadmin.
+    would_demote_super = (
+        target.isSuperAdmin
+        and changes.get("isSuperAdmin") is False
+    )
+    if would_demote_super and user_storage.count_super_admins() <= 1:
+        raise HTTPException(
+            status_code=409,
+            detail="Kan ikke fjerne den siste superadmin-en.",
+        )
+
+    # Map camelCase request fields to the snake_case storage kwargs.
+    storage_kwargs: dict = {}
+    if "name" in changes:
+        storage_kwargs["name"] = changes["name"]
+    if "isAdmin" in changes:
+        storage_kwargs["is_admin"] = changes["isAdmin"]
+    if "isSuperAdmin" in changes:
+        storage_kwargs["is_super_admin"] = changes["isSuperAdmin"]
+
+    updated = user_storage.update_user(user_id, **storage_kwargs)
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found")
+    return updated
 
 
 @app.get("/locations/{location_id}/users", response_model=List[str])
