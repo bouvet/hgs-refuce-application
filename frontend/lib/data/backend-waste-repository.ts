@@ -81,28 +81,24 @@ export class BackendWasteRepository implements WasteRepository {
     return list[0] ?? null;
   }
 
-  async saveRegistration(reg: WasteRegistration): Promise<void> {
-    try {
-      await this.request<WasteRegistration>(
-        `/locations/${encodeURIComponent(this.locationId)}/registrations/${encodeURIComponent(reg.id)}`,
-        {
-          method: "PUT",
-          body: JSON.stringify(reg),
-        },
-      );
-    } catch (err) {
-      if (err instanceof HttpError && err.status === 404) {
-        await this.request<WasteRegistration>(
-          `/locations/${encodeURIComponent(this.locationId)}/registrations`,
-          {
-            method: "POST",
-            body: JSON.stringify(reg),
-          },
-        );
-        return;
-      }
-      throw err;
-    }
+  async createRegistration(reg: WasteRegistration): Promise<void> {
+    await this.request<WasteRegistration>(
+      `/locations/${encodeURIComponent(this.locationId)}/registrations`,
+      {
+        method: "POST",
+        body: JSON.stringify(reg),
+      },
+    );
+  }
+
+  async updateRegistration(reg: WasteRegistration): Promise<void> {
+    await this.request<WasteRegistration>(
+      `/locations/${encodeURIComponent(this.locationId)}/registrations/${encodeURIComponent(reg.id)}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(reg),
+      },
+    );
   }
 
   async deleteRegistration(id: string): Promise<void> {

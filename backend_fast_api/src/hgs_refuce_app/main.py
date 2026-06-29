@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .logging_config import flush_logs, setup_logging
-from .auth import create_access_token, verify_access_token, extract_bearer_token
+from .auth import create_access_token, verify_access_token, extract_bearer_token, verify_service_hmac
 from .models import (
     Report,
     SubmitReportRequest,
@@ -21,8 +21,10 @@ from .models import (
     CurrentUser,
     SsoResolveRequest,
     SsoResolveResponse,
+    PendingAccessRequest,
     SetPreferredLocationRequest,
     CreateUserRequest,
+    UpdateUserRequest,
     CreateLocationRequest,
     LocationUserEntry,
     LoginRequest,
@@ -41,24 +43,30 @@ async def lifespan(_: FastAPI):
     if not user_storage.list_locations():
         logger.info("initializing with demo data")
         bouvet_id = user_storage.create_location("Bouvet Office")
-        user_storage.create_user("common", is_admin=False, password="common")
-        user_storage.create_user("admin", is_admin=True, password="admin")
-        user_storage.add_user_to_location(bouvet_id, "common")
-        user_storage.add_user_to_location(bouvet_id, "admin")
-    # Create super-admin user if it doesn't exist
+        user_storage.create_user("common@example.com", is_admin=False, password="common")
+        user_storage.create_user("admin@example.com", is_admin=True, password="admin")
+        user_storage.add_user_to_location(bouvet_id, "common@example.com")
+        user_storage.add_user_to_location(bouvet_id, "admin@example.com")
+    # Create super-admin user if it doesn't exist (keeping legacy name for PIN login)
     if not user_storage.user_exists("sadmin"):
         logger.info("creating super-admin user")
         user_storage.create_user("sadmin", is_admin=True, password="sadmin", is_super_admin=True)
+    # Also create an email-based superadmin for SSO testing
+    sadmin_email = "sadmin@example.com"
+    if not user_storage.user_exists(sadmin_email):
+        logger.info("creating email-based super-admin user")
+        user_storage.create_user(sadmin_email, is_admin=True, password="", is_super_admin=True)
     # Ensure Haugesund demo data
     haugesund = user_storage.get_location_by_name("Haugesund")
     if not haugesund:
         haugesund_id = user_storage.create_location("Haugesund")
     else:
         haugesund_id = haugesund.id
-    if not user_storage.user_exists("haugesundUser"):
-        user_storage.create_user("haugesundUser", is_admin=False, password="123")
-    if not user_storage.location_has_access(haugesund_id, "haugesundUser"):
-        user_storage.add_user_to_location(haugesund_id, "haugesundUser")
+    haugesund_email = "haugesund@example.com"
+    if not user_storage.user_exists(haugesund_email):
+        user_storage.create_user(haugesund_email, is_admin=False, password="123")
+    if not user_storage.location_has_access(haugesund_id, haugesund_email):
+        user_storage.add_user_to_location(haugesund_id, haugesund_email)
     # Ensure Stavanger demo data
     stavanger = user_storage.get_location_by_name("Stavanger")
     if not stavanger:
@@ -69,6 +77,13 @@ async def lifespan(_: FastAPI):
         user_storage.create_user("stavangerUser", is_admin=False, password="123")
     if not user_storage.location_has_access(stavanger_id, "stavangerUser"):
         user_storage.add_user_to_location(stavanger_id, "stavangerUser")
+    # Ensure SSO test user exists (for development)
+    bouvet = user_storage.get_location_by_name("Bouvet Office") or None
+    if bouvet:
+        sso_test_email = "sso-test@example.com"
+        if not user_storage.user_exists(sso_test_email):
+            user_storage.create_user(sso_test_email, is_admin=False)
+            user_storage.add_user_to_location(bouvet.id, sso_test_email)
     try:
         yield
     finally:
@@ -161,6 +176,19 @@ def get_admin_secret(x_admin_secret: Optional[str] = Header(None)) -> str:
     if x_admin_secret != expected:
         raise HTTPException(status_code=403, detail="Invalid admin secret")
     return x_admin_secret
+
+
+def verify_service_auth(
+    x_service_sig_version: Optional[str] = Header(None),
+    x_service_sig_timestamp: Optional[str] = Header(None),
+    x_service_sig: Optional[str] = Header(None),
+) -> None:
+    if not x_service_sig_version or not x_service_sig_timestamp or not x_service_sig:
+        raise HTTPException(status_code=401, detail="Missing signature headers")
+    try:
+        verify_service_hmac(x_service_sig, x_service_sig_timestamp, x_service_sig_version)
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
 
 
 def require_admin(user_id: str = Depends(get_user_id)) -> str:
@@ -257,10 +285,35 @@ def admin_add_user_to_location(
     return {"detail": "User added to location"}
 
 
+# ---------- pending access requests (super-admin) ----------
+
+@app.get("/admin/access-requests", response_model=List[PendingAccessRequest])
+def list_access_requests(_: str = Depends(require_super_admin)):
+    return user_storage.list_pending_requests()
+
+
+@app.delete(
+    "/admin/access-requests/{email}",
+    status_code=204,
+    response_class=Response,
+)
+def delete_access_request(
+    email: str,
+    _: str = Depends(require_super_admin),
+):
+    if not user_storage.delete_pending_request(email):
+        raise HTTPException(status_code=404, detail="Pending request not found")
+    logger.info("dismissed pending access request for %s", email)
+    return Response(status_code=204)
+
+
 # ---------- auth endpoints ----------
 
 @app.post("/auth/login", response_model=LoginResponse)
-def login(req: LoginRequest):
+def login(
+    req: LoginRequest,
+    _: None = Depends(verify_service_auth),
+):
     if not user_storage.user_exists(req.username):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     if not user_storage.check_password(req.username, req.password):
@@ -281,14 +334,24 @@ def validate_token(user_id: str = Depends(get_user_id)):
 
 
 @app.post("/auth/sso-resolve", response_model=SsoResolveResponse)
-def sso_resolve(req: SsoResolveRequest):
-    # Map an Entra email to a backend user. Backend users are provisioned with
-    # their email as the user id; we only confirm the user exists and return
-    # their identity + normalized role. The frontend stores backendUserId only.
+def sso_resolve(
+    req: SsoResolveRequest,
+    _: None = Depends(verify_service_auth),
+):
+    # Map an Entra email to a backend user. If the email is unknown, queue
+    # the attempt as a pending access request so a superadmin can approve or
+    # dismiss it from the admin panel. Always returns 200; the frontend reads
+    # `status` to decide whether to persist `backendUserId` on the BA user.
     user = user_storage.get_user(req.email)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not provisioned")
-    return SsoResolveResponse(backendUserId=user.id, role=_role_for(user))
+    if user:
+        return SsoResolveResponse(
+            status="resolved",
+            backendUserId=user.id,
+            role=_role_for(user),
+        )
+    logger.info("sso_resolve: queuing pending access request for %s", req.email)
+    user_storage.upsert_pending_request(req.email, req.name)
+    return SsoResolveResponse(status="pending")
 
 
 # ---------- current user ----------
@@ -306,6 +369,7 @@ def get_current_user(user_id: str = Depends(get_user_id)):
     return CurrentUser(
         backendUserId=user.id,
         role=_role_for(user),
+        name=user.name,
         locations=locations,
         preferredLocationId=preferred,
     )
@@ -365,10 +429,37 @@ def create_user_as_admin(
     req: CreateUserRequest,
     _: str = Depends(require_admin)
 ):
+    # Validate the id/password combination matches one of the two supported
+    # provisioning modes. The admin UI enforces this client-side too, but the
+    # backend is the authority — reject mismatches with 422 so a misbehaving
+    # client can't create an SSO user with a password (or vice versa).
+    has_at = "@" in req.id
+    if req.password is not None:
+        if has_at:
+            raise HTTPException(
+                status_code=422,
+                detail="PIN-brukere skal ha et brukernavn uten '@'.",
+            )
+        if len(req.password) < 4:
+            raise HTTPException(
+                status_code=422,
+                detail="PIN m\u00e5 v\u00e6re minst 4 tegn.",
+            )
+    else:
+        if not has_at:
+            raise HTTPException(
+                status_code=422,
+                detail="SSO-brukere m\u00e5 opprettes med en e-postadresse.",
+            )
     if user_storage.user_exists(req.id):
         raise HTTPException(status_code=409, detail="User already exists")
-    user_storage.create_user(req.id, req.isAdmin)
-    return User(id=req.id, isAdmin=req.isAdmin, isSuperAdmin=False)
+    user_storage.create_user(req.id, req.isAdmin, password=req.password, name=req.name)
+    # If we just provisioned an SSO user, clear any pending access request
+    # for the same email so the inbox stays tidy. PIN users never have a
+    # matching pending row (those are always emails).
+    if req.password is None:
+        user_storage.delete_pending_request(req.id)
+    return User(id=req.id, isAdmin=req.isAdmin, isSuperAdmin=False, name=req.name)
 
 
 @app.delete("/users/{user_id}", status_code=204, response_class=Response)
@@ -382,6 +473,59 @@ def delete_user_endpoint(
         raise HTTPException(status_code=404, detail="User not found")
     user_storage.delete_user(user_id)
     return Response(status_code=204)
+
+
+@app.put("/users/{user_id}", response_model=User)
+def update_user_endpoint(
+    user_id: str,
+    req: UpdateUserRequest,
+    caller_id: str = Depends(require_admin),
+):
+    # PATCH semantics: only fields present in the request body are touched.
+    # Authorisation: any admin may edit `name`; only superadmins may toggle
+    # the role flags. Last-superadmin demotion is refused to prevent the org
+    # from locking itself out.
+    target = user_storage.get_user(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    changes = req.model_dump(exclude_unset=True)
+    touches_role = "isAdmin" in changes or "isSuperAdmin" in changes
+
+    if touches_role:
+        caller = user_storage.get_user(caller_id)
+        if not caller or not caller.isSuperAdmin:
+            raise HTTPException(
+                status_code=403,
+                detail="Bare superadmin kan endre rolle.",
+            )
+
+    # Guard against demoting the last remaining superadmin. Applies whether
+    # the caller flips `isSuperAdmin` directly or sets `isAdmin=False` on a
+    # row that is also a superadmin.
+    would_demote_super = (
+        target.isSuperAdmin
+        and changes.get("isSuperAdmin") is False
+    )
+    if would_demote_super and user_storage.count_super_admins() <= 1:
+        raise HTTPException(
+            status_code=409,
+            detail="Kan ikke fjerne den siste superadmin-en.",
+        )
+
+    # Map camelCase request fields to the snake_case storage kwargs.
+    storage_kwargs: dict = {}
+    if "name" in changes:
+        storage_kwargs["name"] = changes["name"]
+    if "isAdmin" in changes:
+        storage_kwargs["is_admin"] = changes["isAdmin"]
+    if "isSuperAdmin" in changes:
+        storage_kwargs["is_super_admin"] = changes["isSuperAdmin"]
+
+    updated = user_storage.update_user(user_id, **storage_kwargs)
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found")
+    return updated
 
 
 @app.get("/locations/{location_id}/users", response_model=List[str])

@@ -33,10 +33,14 @@ const pinSignInSchema = z.object({
 
 // We only consume the backend user's stable id. Role and location are NOT
 // read here — the backend stays the source of truth (queried via /currentUser).
+// Shape matches FastAPI LoginResponse: { accessToken, user: { id, isAdmin, isSuperAdmin } }
 type BackendLoginResponse = {
-  id: string;
-  email?: string;
-  name?: string;
+  accessToken: string;
+  user: {
+    id: string;
+    isAdmin: boolean;
+    isSuperAdmin: boolean;
+  };
 };
 
 function syntheticEmail(username: string): string {
@@ -79,28 +83,26 @@ export const pinCredentials = (): BetterAuthPlugin => ({
         }
 
         const payload = (await backendResp.json()) as BackendLoginResponse;
-        const email = payload.email ?? syntheticEmail(username);
-        const name = payload.name ?? username;
+        const backendUserId = payload.user.id;
+        const email = syntheticEmail(username);
         const adapter = ctx.context.internalAdapter;
 
         let user;
         try {
-          user =
-            (await adapter.findUserByEmail(email))?.user ??
-            (await adapter.findUserByEmail(syntheticEmail(username)))?.user;
+          user = (await adapter.findUserByEmail(email))?.user;
 
           if (!user) {
             user = await adapter.createUser({
               email,
-              name,
+              name: username,
               emailVerified: true,
-              backendUserId: payload.id,
+              backendUserId,
             });
           } else if (
-            (user as Record<string, unknown>).backendUserId !== payload.id
+            (user as Record<string, unknown>).backendUserId !== backendUserId
           ) {
             user = await adapter.updateUser(user.id, {
-              backendUserId: payload.id,
+              backendUserId,
             });
           }
         } catch {

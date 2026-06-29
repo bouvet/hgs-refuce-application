@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 
 class WasteCategoryEntry(BaseModel):
@@ -38,6 +38,7 @@ class User(BaseModel):
     id: str
     isAdmin: bool
     isSuperAdmin: bool = False
+    name: Optional[str] = None
 
 
 class CurrentUser(BaseModel):
@@ -48,6 +49,7 @@ class CurrentUser(BaseModel):
     """
     backendUserId: str
     role: str = Field(..., description="user | admin | superadmin")
+    name: Optional[str] = None
     locations: List[Location]
     preferredLocationId: Optional[str] = None
 
@@ -58,8 +60,24 @@ class SsoResolveRequest(BaseModel):
 
 
 class SsoResolveResponse(BaseModel):
-    backendUserId: str
-    role: str
+    """Result of looking up an SSO email on the backend.
+
+    `status` is the discriminator. On `resolved`, `backendUserId` and `role`
+    are populated. On `pending`, the email was unknown to the backend and a
+    row was upserted into `pending_access_requests` for admin review; the
+    frontend should keep the Better Auth user without a `backendUserId` so a
+    subsequent visit can lazy-resolve once the admin provisions the account.
+    """
+    status: Literal["resolved", "pending"]
+    backendUserId: Optional[str] = None
+    role: Optional[str] = None
+
+
+class PendingAccessRequest(BaseModel):
+    email: str
+    name: Optional[str] = None
+    requestedAt: str
+    lastAttemptAt: str
 
 
 class SetPreferredLocationRequest(BaseModel):
@@ -71,8 +89,28 @@ class LocationUserEntry(BaseModel):
 
 
 class CreateUserRequest(BaseModel):
+    """Payload for `POST /users`.
+
+    - `password` present  → PIN user; `id` must look like a username (no `@`).
+    - `password` absent   → SSO user; `id` must look like an email (contains `@`).
+    - `name` is persisted on the `users` row (optional display name).
+    """
     id: str
     isAdmin: bool = False
+    password: Optional[str] = None
+    name: Optional[str] = None
+
+
+class UpdateUserRequest(BaseModel):
+    """Payload for `PUT /users/{user_id}`. All fields optional (PATCH semantics).
+
+    Only the caller's authority decides which fields are accepted: regular
+    admins may only change `name`; only superadmins may toggle `isAdmin` or
+    `isSuperAdmin`. The backend enforces this — see `main.py`.
+    """
+    name: Optional[str] = None
+    isAdmin: Optional[bool] = None
+    isSuperAdmin: Optional[bool] = None
 
 
 class LoginRequest(BaseModel):

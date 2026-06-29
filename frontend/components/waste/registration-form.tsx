@@ -135,7 +135,11 @@ export function RegistrationForm() {
     };
     try {
       const repo = createWasteRepository(locationId);
-      await repo.saveRegistration(reg);
+      if (wasUpdate) {
+        await repo.updateRegistration(reg);
+      } else {
+        await repo.createRegistration(reg);
+      }
       setExistingId(reg.id);
       toast.success(
         wasUpdate ? "Registrering oppdatert" : "Registrering lagret",
