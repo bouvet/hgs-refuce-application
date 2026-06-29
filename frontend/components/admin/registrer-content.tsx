@@ -171,7 +171,21 @@ export function RegistrerContent() {
       const repo = createWasteRepository(locationId);
       for (const d of weekDates) {
         if (isFuture(d)) continue;
+
+        // Skip days where nothing changed since the last save/load.
+        const dayChanged = DEFAULT_WASTE_CATEGORIES.some((c) => {
+          const saved = savedSnapshot[d]?.[c.id] ?? "";
+          const cur = weights[d]?.[c.id] ?? "";
+          return saved !== cur;
+        });
+        if (!dayChanged) continue;
+
         const existing = regsByDate[d];
+
+        // Don't create empty registrations: if the row is new and every
+        // entry is 0/blank, skip it entirely.
+        if (!existing && dayTotal(d) === 0) continue;
+
         const reg: WasteRegistration = {
           id: existing?.id ?? generateId(),
           date: d,
@@ -183,7 +197,12 @@ export function RegistrerContent() {
           updatedAt: now,
           createdBy: existing?.createdBy ?? user.id,
         };
-        await repo.saveRegistration(reg);
+
+        if (existing) {
+          await repo.updateRegistration(reg);
+        } else {
+          await repo.createRegistration(reg);
+        }
         nextRegsByDate[d] = reg;
       }
       setRegsByDate(nextRegsByDate);
@@ -331,7 +350,7 @@ export function RegistrerContent() {
                     </th>
                   );
                 })}
-                <th className="text-right pr-4 pl-2 py-2.5 border-l border-b border-border font-semibold text-xs bg-muted/50 w-20">
+                <th className="text-right pr-4 pl-2 py-2.5 border-l border-b border-border font-semibold text-xs bg-muted/50 w-24 min-w-[96px]">
                   Sum
                 </th>
               </tr>
@@ -365,7 +384,7 @@ export function RegistrerContent() {
                     return (
                       <td
                         key={d}
-                        className="border-t border-l border-border px-1.5 py-2"
+                        className="border-t border-l border-border px-1 py-2"
                         style={{
                           background: isToday
                             ? "rgba(62,122,58,0.035)"
@@ -377,11 +396,11 @@ export function RegistrerContent() {
                             —
                           </div>
                         ) : (
-                          <div className="flex items-center justify-center gap-1">
+                          <div className="flex items-center justify-center gap-0.5">
                             <button
                               onClick={() => step(d, cat.id, -0.5)}
                               disabled={weekLocked || !hasVal}
-                              className="w-5.5 h-7 rounded-[6px] border border-border flex items-center justify-center disabled:opacity-30 hover:bg-muted transition-colors text-xs leading-none select-none"
+                              className="w-5 h-7 rounded-[6px] border border-border flex items-center justify-center disabled:opacity-30 hover:bg-muted transition-colors text-xs leading-none select-none"
                             >
                               −
                             </button>
@@ -395,7 +414,7 @@ export function RegistrerContent() {
                               inputMode="decimal"
                               className="h-7 rounded-[7px] text-center text-[13px] font-semibold outline-none transition-colors"
                               style={{
-                                width: 52,
+                                width: 40,
                                 border: `1px solid ${hasVal ? "var(--primary)" : "var(--border)"}`,
                                 background: hasVal
                                   ? "var(--secondary)"
@@ -405,7 +424,7 @@ export function RegistrerContent() {
                             <button
                               onClick={() => step(d, cat.id, 0.5)}
                               disabled={weekLocked}
-                              className="w-5.5 h-7 rounded-[6px] border border-border flex items-center justify-center disabled:opacity-30 hover:bg-muted transition-colors text-xs leading-none select-none"
+                              className="w-5 h-7 rounded-[6px] border border-border flex items-center justify-center disabled:opacity-30 hover:bg-muted transition-colors text-xs leading-none select-none"
                             >
                               +
                             </button>

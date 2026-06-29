@@ -62,8 +62,10 @@ export function CategoryBreakdownCard({
             <XAxis type="number" domain={[0, totalForPct]} hide />
             <YAxis type="category" hide />
             <ChartTooltip
+              shared={false}
               content={
                 <ChartTooltipContent
+                  hideLabel
                   formatter={(value, name) => [
                     `${Number(value).toFixed(1)} kg`,
                     chartConfig[name as string]?.label ?? name,
