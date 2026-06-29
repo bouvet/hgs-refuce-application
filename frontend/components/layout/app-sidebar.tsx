@@ -155,7 +155,7 @@ export function AppSidebar() {
         </Link>
         <button
           onClick={handleLogout}
-          className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground mt-2 transition-colors"
+          className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground mt-2 transition-colors cursor-pointer"
         >
           <LogOut className="size-3" />
           Logg ut

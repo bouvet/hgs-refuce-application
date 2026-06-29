@@ -13,6 +13,7 @@ import {
   Plus,
   History,
   MapPin,
+  Settings,
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { signOut } from "@/lib/auth-client";
@@ -26,22 +27,55 @@ import {
 import { cn } from "@/lib/utils";
 
 const allLinks = [
-  { href: "/oversikt", label: "Oversikt", icon: Home, adminOnly: true },
-  { href: "/registrer", label: "Registrer", icon: Plus, adminOnly: false },
-  { href: "/rapportering", label: "Rapportering", icon: Send, adminOnly: true },
+  {
+    href: "/oversikt",
+    label: "Oversikt",
+    icon: Home,
+    adminOnly: true,
+    superAdminOnly: false,
+  },
+  {
+    href: "/registrer",
+    label: "Registrer",
+    icon: Plus,
+    adminOnly: false,
+    superAdminOnly: false,
+  },
+  {
+    href: "/rapportering",
+    label: "Rapportering",
+    icon: Send,
+    adminOnly: true,
+    superAdminOnly: false,
+  },
   {
     href: "/registreringer",
     label: "Registreringer",
     icon: Table2,
     adminOnly: true,
+    superAdminOnly: false,
   },
   {
     href: "/statistikk",
     label: "Statistikk",
     icon: BarChart3,
     adminOnly: true,
+    superAdminOnly: false,
   },
-  { href: "/historikk", label: "Historikk", icon: History, adminOnly: false },
+  {
+    href: "/historikk",
+    label: "Historikk",
+    icon: History,
+    adminOnly: false,
+    superAdminOnly: false,
+  },
+  {
+    href: "/sadmin",
+    label: "Administrasjon",
+    icon: Settings,
+    adminOnly: false,
+    superAdminOnly: true,
+  },
 ];
 
 export function AppHeader() {
@@ -49,7 +83,12 @@ export function AppHeader() {
   const pathname = usePathname();
   const { user, locationName } = useCurrentUser();
   const isAdmin = user?.role === "admin" || user?.role === "superadmin";
-  const links = allLinks.filter((l) => !l.adminOnly || isAdmin);
+  const isSuperAdmin = user?.role === "superadmin";
+  const links = allLinks.filter((l) => {
+    if (l.superAdminOnly) return isSuperAdmin;
+    if (l.adminOnly) return isAdmin;
+    return true;
+  });
 
   async function handleLogout() {
     await signOut({
@@ -154,7 +193,9 @@ export function AppHeader() {
               className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground mt-1.5 transition-colors"
             >
               <MapPin className="size-3 shrink-0" />
-              <span className="truncate">{locationName ?? "Velg lokasjon"}</span>
+              <span className="truncate">
+                {locationName ?? "Velg lokasjon"}
+              </span>
             </SheetClose>
             <button
               onClick={handleLogout}

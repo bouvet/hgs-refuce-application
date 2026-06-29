@@ -4,7 +4,8 @@ import { BackendWasteRepository } from "./backend-waste-repository";
 export interface WasteRepository {
   getRegistrations(): Promise<WasteRegistration[]>;
   getRegistrationByDate(date: string): Promise<WasteRegistration | null>;
-  saveRegistration(reg: WasteRegistration): Promise<void>;
+  createRegistration(reg: WasteRegistration): Promise<void>;
+  updateRegistration(reg: WasteRegistration): Promise<void>;
   deleteRegistration(id: string): Promise<void>;
   getRegistrationsByDateRange(
     from: string,
