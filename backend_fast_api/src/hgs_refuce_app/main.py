@@ -743,14 +743,20 @@ _jinja_env = Environment(
 )
 
 
-@app.get("/locations/{location_id}/reports/{period}/html", response_class=HTMLResponse)
-def get_report_html(
+def _render_report_html(
     location_id: str,
     period: str,
-    _: str = Depends(require_location_access)
-):
+    *,
+    preview: bool,
+) -> HTMLResponse:
+    """Render the report Jinja template for a given period.
+
+    When `preview` is True, the template is rendered without requiring a
+    saved `Report` row — used to let admins preview the current quarter
+    before locking it. When False, a 404 is raised if no report exists.
+    """
     report = data_storage.get_report(location_id, period)
-    if report is None:
+    if report is None and not preview:
         raise HTTPException(status_code=404, detail="Report not found")
 
     location = user_storage.get_location(location_id)
@@ -797,7 +803,8 @@ def get_report_html(
         ]
         reg_rows.append({"date": reg.date, "entries": entries, "total_kg": reg_total})
 
-    submitted_at_display = report.submittedAt[:10] if report.submittedAt else ""
+    submitted_by = report.submittedBy if report else ""
+    submitted_at_display = (report.submittedAt[:10] if report and report.submittedAt else "")
 
     template = _jinja_env.get_template("report_template.html")
     html = template.render(
@@ -810,7 +817,26 @@ def get_report_html(
         category_count=len(categories),
         categories=categories,
         registrations=reg_rows,
-        submitted_by=report.submittedBy,
+        submitted_by=submitted_by,
         submitted_at=submitted_at_display,
+        preview=preview,
     )
     return HTMLResponse(content=html)
+
+
+@app.get("/locations/{location_id}/reports/{period}/html", response_class=HTMLResponse)
+def get_report_html(
+    location_id: str,
+    period: str,
+    _: str = Depends(require_location_access)
+):
+    return _render_report_html(location_id, period, preview=False)
+
+
+@app.get("/locations/{location_id}/reports/{period}/preview-html", response_class=HTMLResponse)
+def get_report_preview_html(
+    location_id: str,
+    period: str,
+    _: str = Depends(require_location_access)
+):
+    return _render_report_html(location_id, period, preview=True)
