@@ -11,6 +11,7 @@ import { useReports } from "@/hooks/use-reports";
 import { DEFAULT_WASTE_CATEGORIES } from "@/lib/data/waste-categories";
 import { dateToQuarter, quarterLabel } from "@/lib/quarters";
 import { cn } from "@/lib/utils";
+import { RegistrationsTableSkeleton } from "@/components/stats/registrations-table-skeleton";
 
 function fmtDay(dateStr: string): string {
   const days = ["søn", "man", "tir", "ons", "tor", "fre", "lør"];
@@ -32,7 +33,7 @@ type GridRow = {
 };
 
 export function RegistrationsTable() {
-  const { registrations } = useWasteRegistrations();
+  const { registrations, isLoading } = useWasteRegistrations();
   const { isPeriodLocked } = useReports();
   const [filter, setFilter] = useState("all");
 
@@ -134,6 +135,10 @@ export function RegistrationsTable() {
     [],
   );
 
+  if (isLoading) {
+    return <RegistrationsTableSkeleton />;
+  }
+
   if (registrations.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 py-16 text-center text-muted-foreground">
@@ -190,7 +195,6 @@ export function RegistrationsTable() {
           filterable={false}
           fitMode="stretch"
           style={{ width: "100%" }}
-         
         />
         {filtered.length > 60 && (
           <div className="px-3 py-2.5 text-xs text-muted-foreground text-center border-t border-border">

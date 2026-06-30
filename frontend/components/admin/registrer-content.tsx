@@ -16,6 +16,7 @@ import { dateToQuarter, quarterLabel } from "@/lib/quarters";
 import { useReports } from "@/hooks/use-reports";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import type { WasteRegistration } from "@/lib/types";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const MONTHS = [
   "jan",
@@ -61,6 +62,7 @@ export function RegistrerContent() {
   const [regsByDate, setRegsByDate] = useState<
     Record<string, WasteRegistration>
   >({});
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   const weekDates = useMemo(() => getWeekDates(selectedDate), [selectedDate]);
   const weekQuarter = dateToQuarter(weekDates[0]);
@@ -95,6 +97,7 @@ export function RegistrerContent() {
       }
       setWeights(next);
       setSavedSnapshot(JSON.parse(JSON.stringify(next)));
+      setHasLoadedOnce(true);
     })();
     return () => {
       cancelled = true;
@@ -225,6 +228,22 @@ export function RegistrerContent() {
   })();
 
   const canGoNext = new Date(weekDates[6]) < new Date(today);
+
+  if (!hasLoadedOnce) {
+    return (
+      <div className="flex flex-col gap-4 max-w-5xl">
+        <div className="flex items-end gap-4">
+          <div className="flex-1 flex flex-col gap-2">
+            <Skeleton className="h-7 w-48" />
+            <Skeleton className="h-4 w-80" />
+          </div>
+          <Skeleton className="h-9 w-80 rounded-[9px]" />
+        </div>
+        <Skeleton className="h-96 rounded-2xl" />
+        <Skeleton className="h-12 w-40 rounded-xl self-end" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-0 max-w-5xl">

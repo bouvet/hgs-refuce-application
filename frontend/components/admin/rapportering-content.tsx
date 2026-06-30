@@ -17,12 +17,21 @@ import type { Report } from "@/lib/types";
 import { ConfirmDialog, type DialogConfig } from "./confirm-dialog";
 import { PeriodCard } from "./rapportering/period-card";
 import { YearAccordion } from "./rapportering/year-accordion";
+import { RapporteringSkeleton } from "./rapportering-skeleton";
 
 export function RapporteringContent() {
-  const { registrations } = useWasteRegistrations();
-  const { reports, submitReport, unlockReport } = useReports();
+  const { registrations, isLoading: registrationsLoading } =
+    useWasteRegistrations();
+  const {
+    reports,
+    submitReport,
+    unlockReport,
+    isLoading: reportsLoading,
+  } = useReports();
   const { user, locationId } = useCurrentUser();
   const [dialog, setDialog] = useState<DialogConfig | null>(null);
+
+  const isLoading = registrationsLoading || reportsLoading;
 
   const currentPeriod = getCurrentQuarter();
   const currentReport = reports.find((r) => r.period === currentPeriod);
@@ -82,6 +91,10 @@ export function RapporteringContent() {
   const dialogTotal = dialog
     ? totalKg(regsInQuarter(registrations, dialog.period))
     : 0;
+
+  if (isLoading) {
+    return <RapporteringSkeleton />;
+  }
 
   return (
     <div className="flex flex-col gap-4 max-w-3xl">

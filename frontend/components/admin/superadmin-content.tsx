@@ -7,6 +7,7 @@ import type { AdminUser, Location, PendingAccessRequest } from "@/lib/types";
 import { Plus, Trash2, ChevronDown, Check, X, Pencil } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { EditUserDialog } from "@/components/admin/edit-user-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type UserFormMode = "sso" | "pin";
 
@@ -512,7 +513,11 @@ export function SuperAdminContent() {
 
             <div className="space-y-2">
               {loadingUsers && (
-                <p className="text-muted-foreground">Laster brukere...</p>
+                <div className="space-y-2">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                  ))}
+                </div>
               )}
               {!loadingUsers && users.length === 0 && (
                 <p className="text-muted-foreground">Ingen brukere funnet</p>
@@ -595,7 +600,11 @@ export function SuperAdminContent() {
 
             <div className="space-y-2">
               {loadingLocations && (
-                <p className="text-muted-foreground">Laster lokasjoner...</p>
+                <div className="space-y-2">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                  ))}
+                </div>
               )}
               {!loadingLocations && locations.length === 0 && (
                 <p className="text-muted-foreground">Ingen lokasjoner funnet</p>
@@ -713,7 +722,11 @@ export function SuperAdminContent() {
             </p>
 
             {loadingRequests && (
-              <p className="text-muted-foreground">Laster forespørsler…</p>
+              <div className="space-y-2">
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                ))}
+              </div>
             )}
             {!loadingRequests && accessRequests.length === 0 && (
               <p className="text-muted-foreground">
