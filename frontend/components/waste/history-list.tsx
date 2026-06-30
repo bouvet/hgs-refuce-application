@@ -5,6 +5,7 @@ import { useReports } from "@/hooks/use-reports";
 import { DEFAULT_WASTE_CATEGORIES } from "@/lib/data/waste-categories";
 import { ClipboardList, Lock, ChevronRight } from "lucide-react";
 import { dateToQuarter, quarterLabel } from "@/lib/quarters";
+import { HistorySkeleton } from "@/components/waste/history-skeleton";
 
 function fmtDay(dateStr: string): string {
   const days = ["søn", "man", "tir", "ons", "tor", "fre", "lør"];
@@ -13,8 +14,12 @@ function fmtDay(dateStr: string): string {
 }
 
 export function HistoryList() {
-  const { registrations } = useWasteRegistrations();
+  const { registrations, isLoading } = useWasteRegistrations();
   const { isPeriodLocked } = useReports();
+
+  if (isLoading) {
+    return <HistorySkeleton />;
+  }
 
   if (registrations.length === 0) {
     return (
