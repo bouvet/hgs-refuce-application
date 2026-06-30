@@ -1,0 +1,5 @@
+{
+  "files.associations": {
+    "**/backend_fast_api/**/*.html": "jinja-html"
+  }
+}
