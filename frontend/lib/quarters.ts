@@ -23,6 +23,11 @@ export function quarterLabel(quarter: string): string {
   return `${qStr} ${y}`;
 }
 
+/** Year component of a period, e.g. "2026-Q1" -> 2026 */
+export function quarterYear(quarter: string): number {
+  return Number(quarter.split("-")[0]);
+}
+
 /** Long label: "Q2 2026 · apr–jun" */
 export function quarterLabelLong(quarter: string): string {
   const [y, qStr] = quarter.split("-");

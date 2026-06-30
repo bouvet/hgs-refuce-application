@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Send, Unlock, Check } from "lucide-react";
+import { Lock, Unlock, Check } from "lucide-react";
 import { quarterLabel } from "@/lib/quarters";
 
 export type DialogConfig = { mode: "submit" | "unlock"; period: string };
@@ -44,7 +44,7 @@ export function ConfirmDialog({
               <Check className="size-8 text-primary" strokeWidth={2.5} />
             </div>
             <div className="text-lg font-bold text-foreground">
-              {mode === "submit" ? "Rapport sendt" : "Periode låst opp"}
+              {mode === "submit" ? "Periode låst" : "Periode låst opp"}
             </div>
             <div className="text-sm text-muted-foreground mt-1 capitalize">
               {quarterLabel(period)}
@@ -53,16 +53,16 @@ export function ConfirmDialog({
         ) : (
           <>
             <div className="text-[18px] font-bold text-foreground mb-1.5">
-              {mode === "submit" ? "Send rapport?" : "Lås opp periode?"}
+              {mode === "submit" ? "Lås periode?" : "Lås opp periode?"}
             </div>
             <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
               {mode === "submit" ? (
                 <>
-                  Du er i ferd med å sende{" "}
+                  Du er i ferd med å låse{" "}
                   <strong className="text-foreground capitalize">
                     {quarterLabel(period)}
-                  </strong>{" "}
-                  til Miljøfyrtårn. Perioden vil låses for videre endringer.
+                  </strong>
+                  . Perioden vil låses for videre endringer.
                 </>
               ) : (
                 <>
@@ -109,10 +109,10 @@ export function ConfirmDialog({
                 } ${sending ? "opacity-60" : ""}`}
               >
                 {sending ? (
-                  "Sender..."
+                  "Låser..."
                 ) : mode === "submit" ? (
                   <>
-                    <Send className="size-3.5" /> Send rapport
+                    <Lock className="size-3.5" /> Lås periode
                   </>
                 ) : (
                   <>

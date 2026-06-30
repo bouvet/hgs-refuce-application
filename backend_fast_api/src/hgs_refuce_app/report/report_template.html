@@ -1,379 +1,467 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="nb">
-<head>
-  <meta charset="utf-8">
-  <title>WasteFlow — Kvartalsrapport {{ period }}</title>
-  <style>
-    @page {
-      size: A4;
-      margin: 20mm 18mm 20mm 18mm;
-    }
+  <head>
+    <meta charset="utf-8" />
+    <title>Rapport-{{ period }}-{{ location_name }}</title>
+    <style>
+      @page {
+        size: A4;
+        margin: 20mm 18mm 20mm 18mm;
+      }
 
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-      background: #f4f1ea;
-      color: #2a1f15;
-      padding: 40px;
-    }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial,
+          sans-serif;
+        background: #f4f1ea;
+        color: #2a1f15;
+        padding: 40px;
+      }
 
-    @media print {
-      body { background: #fff; padding: 0; }
-      .no-print { display: none; }
-    }
+      @media print {
+        body {
+          background: #fff;
+          padding: 0;
+        }
+        .no-print {
+          display: none;
+        }
+      }
 
-    .page {
-      background: #fff;
-      max-width: 720px;
-      margin: 0 auto;
-      padding: 48px 52px;
-      border-radius: 12px;
-      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
-    }
+      .page {
+        background: #fff;
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 48px 52px;
+        border-radius: 12px;
+        box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+      }
 
-    @media print {
-      .page { box-shadow: none; border-radius: 0; max-width: 100%; padding: 0; }
-    }
+      @media print {
+        .page {
+          box-shadow: none;
+          border-radius: 0;
+          max-width: 100%;
+          padding: 0;
+        }
+      }
 
-    /* Header */
-    .header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      margin-bottom: 32px;
-    }
+      /* Header */
+      .header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 32px;
+      }
 
-    .logo-mark {
-      width: 44px;
-      height: 44px;
-      background: #3e7a3a;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+      .logo-mark {
+        width: 44px;
+        height: 44px;
+        background: #3e7a3a;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
 
-    .logo-mark svg {
-      width: 26px;
-      height: 26px;
-    }
+      .logo-mark svg {
+        width: 26px;
+        height: 26px;
+      }
 
-    .wordmark {
-      font-size: 28px;
-      font-weight: 900;
-      letter-spacing: -0.8px;
-      line-height: 1;
-      margin-top: 8px;
-    }
+      .wordmark {
+        font-size: 28px;
+        font-weight: 900;
+        letter-spacing: -0.8px;
+        line-height: 1;
+        margin-top: 8px;
+      }
 
-    .wordmark span { color: #3e7a3a; }
+      .wordmark span {
+        color: #3e7a3a;
+      }
 
-    .header-right {
-      text-align: right;
-    }
+      .header-right {
+        text-align: right;
+      }
 
-    .quarter-label {
-      font-size: 32px;
-      font-weight: 800;
-      letter-spacing: -1px;
-      line-height: 1;
-    }
+      .quarter-label {
+        font-size: 32px;
+        font-weight: 800;
+        letter-spacing: -1px;
+        line-height: 1;
+      }
 
-    .quarter-label em { color: #3e7a3a; font-style: normal; }
+      .quarter-label em {
+        color: #3e7a3a;
+        font-style: normal;
+      }
 
-    .location-label {
-      font-size: 14px;
-      color: #7a6e62;
-      margin-top: 4px;
-    }
+      .location-label {
+        font-size: 14px;
+        color: #7a6e62;
+        margin-top: 4px;
+      }
 
-    .divider {
-      border: none;
-      border-top: 2px solid #e3dccb;
-      margin: 0 0 32px 0;
-    }
+      .divider {
+        border: none;
+        border-top: 2px solid #e3dccb;
+        margin: 0 0 32px 0;
+      }
 
-    /* Summary strip */
-    .summary {
-      display: flex;
-      gap: 24px;
-      margin-bottom: 36px;
-    }
+      /* Summary strip */
+      .summary {
+        display: flex;
+        gap: 24px;
+        margin-bottom: 36px;
+      }
 
-    .stat-box {
-      flex: 1;
-      background: #f8f6f1;
-      border: 1px solid #e3dccb;
-      border-radius: 8px;
-      padding: 16px 20px;
-    }
+      .stat-box {
+        flex: 1;
+        background: #f8f6f1;
+        border: 1px solid #e3dccb;
+        border-radius: 8px;
+        padding: 16px 20px;
+      }
 
-    .stat-label {
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-      color: #7a6e62;
-      margin-bottom: 4px;
-    }
+      .stat-label {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        color: #7a6e62;
+        margin-bottom: 4px;
+      }
 
-    .stat-value {
-      font-size: 26px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-      color: #2a1f15;
-    }
+      .stat-value {
+        font-size: 26px;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+        color: #2a1f15;
+      }
 
-    .stat-unit {
-      font-size: 13px;
-      font-weight: 500;
-      color: #7a6e62;
-      margin-left: 2px;
-    }
+      .stat-unit {
+        font-size: 13px;
+        font-weight: 500;
+        color: #7a6e62;
+        margin-left: 2px;
+      }
 
-    /* Category table */
-    .section-title {
-      font-size: 13px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-      color: #7a6e62;
-      margin-bottom: 14px;
-    }
+      /* Category table */
+      .section-title {
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        color: #7a6e62;
+        margin-bottom: 14px;
+      }
 
-    .category-list {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-bottom: 40px;
-    }
+      .category-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-bottom: 40px;
+      }
 
-    .category-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
+      .category-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
 
-    .category-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 3px;
-      flex-shrink: 0;
-    }
+      .category-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        flex-shrink: 0;
+      }
 
-    .category-name {
-      font-size: 14px;
-      font-weight: 500;
-      width: 130px;
-      flex-shrink: 0;
-    }
+      .category-name {
+        font-size: 14px;
+        font-weight: 500;
+        width: 130px;
+        flex-shrink: 0;
+      }
 
-    .bar-track {
-      flex: 1;
-      height: 10px;
-      background: #f0ece4;
-      border-radius: 5px;
-      overflow: hidden;
-    }
+      .bar-track {
+        flex: 1;
+        height: 10px;
+        background: #f0ece4;
+        border-radius: 5px;
+        overflow: hidden;
+      }
 
-    .bar-fill {
-      height: 100%;
-      border-radius: 5px;
-    }
+      .bar-fill {
+        height: 100%;
+        border-radius: 5px;
+      }
 
-    .category-weight {
-      font-size: 14px;
-      font-weight: 700;
-      width: 70px;
-      text-align: right;
-      flex-shrink: 0;
-    }
+      .category-weight {
+        font-size: 14px;
+        font-weight: 700;
+        width: 70px;
+        text-align: right;
+        flex-shrink: 0;
+      }
 
-    .category-pct {
-      font-size: 12px;
-      color: #7a6e62;
-      width: 42px;
-      text-align: right;
-      flex-shrink: 0;
-    }
+      .category-pct {
+        font-size: 12px;
+        color: #7a6e62;
+        width: 42px;
+        text-align: right;
+        flex-shrink: 0;
+      }
 
-    /* Registration log */
-    .reg-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
+      /* Registration log */
+      .reg-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
 
-    .reg-table th {
-      text-align: left;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: #7a6e62;
-      padding: 0 8px 8px 0;
-      border-bottom: 1px solid #e3dccb;
-    }
+      .reg-table th {
+        text-align: left;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #7a6e62;
+        padding: 0 8px 8px 0;
+        border-bottom: 1px solid #e3dccb;
+      }
 
-    .reg-table th:last-child { text-align: right; padding-right: 0; }
+      .reg-table th:last-child {
+        text-align: right;
+        padding-right: 0;
+      }
 
-    .reg-table td {
-      padding: 8px 8px 8px 0;
-      border-bottom: 1px solid #f0ece4;
-      vertical-align: top;
-      color: #2a1f15;
-    }
+      .reg-table td {
+        padding: 8px 8px 8px 0;
+        border-bottom: 1px solid #f0ece4;
+        vertical-align: top;
+        color: #2a1f15;
+      }
 
-    .reg-table td:last-child { text-align: right; padding-right: 0; font-weight: 600; }
+      .reg-table td:last-child {
+        text-align: right;
+        padding-right: 0;
+        font-weight: 600;
+      }
 
-    .reg-table tr:last-child td { border-bottom: none; }
+      .reg-table tr:last-child td {
+        border-bottom: none;
+      }
 
-    .entries-inline {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-      margin-top: 2px;
-    }
+      .entries-inline {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 2px;
+      }
 
-    .entry-chip {
-      font-size: 11px;
-      background: #f0ece4;
-      border-radius: 4px;
-      padding: 1px 6px;
-      color: #4a3f35;
-    }
+      .entry-chip {
+        font-size: 11px;
+        background: #f0ece4;
+        border-radius: 4px;
+        padding: 1px 6px;
+        color: #4a3f35;
+      }
 
-    /* Footer */
-    .footer {
-      margin-top: 40px;
-      padding-top: 16px;
-      border-top: 1px solid #e3dccb;
-      display: flex;
-      justify-content: space-between;
-      font-size: 11px;
-      color: #9a8e84;
-    }
+      /* Footer */
+      .footer {
+        margin-top: 40px;
+        padding-top: 16px;
+        border-top: 1px solid #e3dccb;
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: #9a8e84;
+      }
 
-    /* Print button */
-    .print-btn {
-      display: block;
-      margin: 24px auto 0;
-      padding: 10px 28px;
-      background: #3e7a3a;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      letter-spacing: 0.1px;
-    }
+      /* Print button */
+      .print-btn {
+        display: block;
+        margin: 24px auto 0;
+        padding: 10px 28px;
+        background: #3e7a3a;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        letter-spacing: 0.1px;
+      }
 
-    .print-btn:hover { background: #2f5e2c; }
+      .print-btn:hover {
+        background: #2f5e2c;
+      }
 
-    @media print {
-      .print-btn { display: none; }
-    }
-  </style>
-</head>
-<body>
-  <div class="page">
+      @media print {
+        .print-btn {
+          display: none;
+        }
+      }
 
-    <!-- Header -->
-    <div class="header">
-      <div>
-        <div class="logo-mark">
-          <svg viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M7 22 a6 6 0 0 1 -6 -6 c0 -4 4 -8 12 -8 c0 8 -4 14 -6 14 Z M4 22 l8 -8" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <div class="wordmark">Waste<span>Flow</span></div>
+      /* Preview banner */
+      .preview-banner {
+        background: #fff7e0;
+        border: 1px solid #e8d27a;
+        color: #6b5410;
+        border-radius: 8px;
+        padding: 10px 14px;
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 20px;
+        text-align: center;
+      }
+
+      @media print {
+        .preview-banner {
+          background: #fff7e0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      {% if preview %}
+      <div class="preview-banner">
+        Forhåndsvisning &mdash; perioden er ikke låst
       </div>
-      <div class="header-right">
-        <div class="quarter-label"><em>{{ quarter_label }}</em> {{ year }}</div>
-        <div class="location-label">{{ location_name }}</div>
-      </div>
-    </div>
-
-    <hr class="divider">
-
-    <!-- Summary strip -->
-    <div class="summary">
-      <div class="stat-box">
-        <div class="stat-label">Total avfall</div>
-        <div class="stat-value">{{ "%.1f"|format(total_kg) }}<span class="stat-unit">kg</span></div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-label">Registreringer</div>
-        <div class="stat-value">{{ registration_count }}</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-label">Kategorier</div>
-        <div class="stat-value">{{ category_count }}</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-label">Innsendt av</div>
-        <div class="stat-value" style="font-size:16px; padding-top:4px;">{{ submitted_by }}</div>
-      </div>
-    </div>
-
-    <!-- Category breakdown -->
-    <div class="section-title">Fordeling per kategori</div>
-    <div class="category-list">
-      {% for cat in categories %}
-      <div class="category-row">
-        <div class="category-dot" style="background: {{ cat.color }};"></div>
-        <div class="category-name">{{ cat.label }}</div>
-        <div class="bar-track">
-          <div class="bar-fill" style="width: {{ cat.pct }}%; background: {{ cat.color }};"></div>
-        </div>
-        <div class="category-weight">{{ "%.1f"|format(cat.total_kg) }} kg</div>
-        <div class="category-pct">{{ "%.0f"|format(cat.pct) }}%</div>
-      </div>
-      {% endfor %}
-      {% if not categories %}
-      <div style="color:#9a8e84; font-size:13px;">Ingen registreringer i denne perioden.</div>
       {% endif %}
+
+      <!-- Header -->
+      <div class="header">
+        <div>
+          <div class="logo-mark">
+            <svg
+              viewBox="0 0 26 26"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M7 22 a6 6 0 0 1 -6 -6 c0 -4 4 -8 12 -8 c0 8 -4 14 -6 14 Z M4 22 l8 -8"
+                stroke="#fff"
+                stroke-width="2.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </div>
+          <div class="wordmark">Waste<span>Flow</span></div>
+        </div>
+        <div class="header-right">
+          <div class="quarter-label">
+            <em>{{ quarter_label }}</em> {{ year }}
+          </div>
+          <div class="location-label">{{ location_name }}</div>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <!-- Summary strip -->
+      <div class="summary">
+        <div class="stat-box">
+          <div class="stat-label">Total avfall</div>
+          <div class="stat-value">
+            {{ "%.1f"|format(total_kg) }}<span class="stat-unit">kg</span>
+          </div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Registreringer</div>
+          <div class="stat-value">{{ registration_count }}</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Kategorier</div>
+          <div class="stat-value">{{ category_count }}</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Innsendt av</div>
+          <div class="stat-value" style="font-size: 16px; padding-top: 4px">
+            {{ submitted_by or "—" }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Category breakdown -->
+      <div class="section-title">Fordeling per kategori</div>
+      <div class="category-list">
+        {% for cat in categories %}
+        <div class="category-row">
+          <div class="category-dot" style="background: {{ cat.color }};"></div>
+          <div class="category-name">{{ cat.label }}</div>
+          <div class="bar-track">
+            <div
+              class="bar-fill"
+              style="width: {{ cat.pct }}%; background: {{ cat.color }};"
+            ></div>
+          </div>
+          <div class="category-weight">
+            {{ "%.1f"|format(cat.total_kg) }} kg
+          </div>
+          <div class="category-pct">{{ "%.0f"|format(cat.pct) }}%</div>
+        </div>
+        {% endfor %} {% if not categories %}
+        <div style="color: #9a8e84; font-size: 13px">
+          Ingen registreringer i denne perioden.
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Registration log -->
+      {% if registrations %}
+      <div class="section-title">Registreringslogg</div>
+      <table class="reg-table">
+        <thead>
+          <tr>
+            <th>Dato</th>
+            <th>Kategorier</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for reg in registrations %}
+          <tr>
+            <td style="white-space: nowrap">{{ reg.date }}</td>
+            <td>
+              <div class="entries-inline">
+                {% for entry in reg.entries %}
+                <span class="entry-chip"
+                  >{{ entry.label }}: {{ "%.1f"|format(entry.weightKg) }}
+                  kg</span
+                >
+                {% endfor %}
+              </div>
+            </td>
+            <td>{{ "%.1f"|format(reg.total_kg) }} kg</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+
+      <!-- Footer -->
+      <div class="footer">
+        <span>WasteFlow kvartalsrapport &mdash; {{ period }}</span>
+        {% if submitted_at %}
+        <span>Innsendt {{ submitted_at }}</span>
+        {% else %}
+        <span>Ikke innsendt</span>
+        {% endif %}
+      </div>
     </div>
 
-    <!-- Registration log -->
-    {% if registrations %}
-    <div class="section-title">Registreringslogg</div>
-    <table class="reg-table">
-      <thead>
-        <tr>
-          <th>Dato</th>
-          <th>Kategorier</th>
-          <th>Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for reg in registrations %}
-        <tr>
-          <td style="white-space:nowrap;">{{ reg.date }}</td>
-          <td>
-            <div class="entries-inline">
-              {% for entry in reg.entries %}
-              <span class="entry-chip">{{ entry.label }}: {{ "%.1f"|format(entry.weightKg) }} kg</span>
-              {% endfor %}
-            </div>
-          </td>
-          <td>{{ "%.1f"|format(reg.total_kg) }} kg</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% endif %}
-
-    <!-- Footer -->
-    <div class="footer">
-      <span>WasteFlow kvartalsrapport &mdash; {{ period }}</span>
-      <span>Innsendt {{ submitted_at }}</span>
-    </div>
-
-  </div>
-
-  <button class="print-btn no-print" onclick="window.print()">Skriv ut / Lagre som PDF</button>
-</body>
+    <button class="print-btn no-print" onclick="window.print()">
+      Skriv ut / Lagre som PDF
+    </button>
+  </body>
 </html>
