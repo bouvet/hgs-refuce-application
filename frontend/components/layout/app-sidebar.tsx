@@ -103,7 +103,7 @@ export function AppSidebar() {
         </div>
         <div>
           <div className="text-sm font-bold text-foreground leading-tight">
-            BossApp
+            WasteFlow
           </div>
           <div className="text-xs text-muted-foreground leading-tight">
             {isSuperAdmin ? "Super-admin" : isAdmin ? "Admin" : "Registrerer"}
