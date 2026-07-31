@@ -143,7 +143,7 @@ export function AppHeader() {
             </div>
             <div>
               <div className="text-sm font-bold text-foreground leading-tight">
-                BossApp
+                WasteFlow
               </div>
               <div className="text-xs text-muted-foreground leading-tight">
                 {isAdmin ? "Admin" : "Registrerer"}
