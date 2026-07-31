@@ -118,17 +118,24 @@
       /* Summary strip */
       .summary {
         display: flex;
-        gap: 24px;
+        gap: 10px;
         margin-bottom: 36px;
+        justify-content: space-between;
       }
 
       .stat-box {
-        flex: 1;
         min-width: 0;
         background: #f8f6f1;
         border: 1px solid #e3dccb;
         border-radius: 8px;
-        padding: 16px 20px;
+        padding: 20px 15px;
+      }
+
+      .stat-box:nth-child(4) {
+        flex: 2;
+      }
+      .stat-box:nth-child(1) {
+        flex: 1;
       }
 
       .stat-value.submitter {
@@ -143,7 +150,7 @@
         text-transform: uppercase;
         letter-spacing: 0.6px;
         color: #7a6e62;
-        margin-bottom: 4px;
+        margin-bottom: 15px;
       }
 
       .stat-value {
@@ -350,17 +357,21 @@
         <div>
           <div class="logo-mark">
             <svg
-              viewBox="0 0 26 26"
-              fill="none"
               xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#fff"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="lucide lucide-leaf-icon lucide-leaf"
             >
               <path
-                d="M7 22 a6 6 0 0 1 -6 -6 c0 -4 4 -8 12 -8 c0 8 -4 14 -6 14 Z M4 22 l8 -8"
-                stroke="#fff"
-                stroke-width="2.2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+                d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"
               />
+              <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
             </svg>
           </div>
           <div class="wordmark">Waste<span>Flow</span></div>
