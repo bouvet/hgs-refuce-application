@@ -8,9 +8,14 @@ import { LastRegistrationCard } from "@/components/stats/last-registration-card"
 import { CategoryBreakdownCard } from "@/components/stats/category-breakdown-card";
 import { InsightsCard } from "@/components/stats/insights-card";
 import { CalendarCard } from "@/components/stats/calendar-card";
+import { DashboardSkeleton } from "@/components/stats/dashboard-skeleton";
 
 export function DashboardContent() {
   const data = useDashboardData();
+
+  if (data.isLoading) {
+    return <DashboardSkeleton />;
+  }
 
   if (data.registrations.length === 0) {
     return (

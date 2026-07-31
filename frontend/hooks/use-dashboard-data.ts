@@ -12,12 +12,7 @@ import {
   daysLeftInQuarter,
   daysInQuarter,
 } from "@/lib/quarters";
-import {
-  regsInQuarter,
-  totalKg,
-  catVal,
-  daysBetween,
-} from "@/lib/waste-utils";
+import { regsInQuarter, totalKg, catVal, daysBetween } from "@/lib/waste-utils";
 import type { WasteCategory, WasteRegistration, Report } from "@/lib/types";
 
 export type CategoryTotal = {
@@ -27,6 +22,7 @@ export type CategoryTotal = {
 };
 
 export type DashboardData = {
+  isLoading: boolean;
   registrations: WasteRegistration[];
   quarter: string;
   prevQuarter: string | null;
@@ -53,9 +49,11 @@ export type DashboardData = {
 };
 
 export function useDashboardData(): DashboardData {
-  const { registrations } = useWasteRegistrations();
-  const { reports } = useReports();
+  const { registrations, isLoading: registrationsLoading } =
+    useWasteRegistrations();
+  const { reports, isLoading: reportsLoading } = useReports();
   const [today] = useState(() => new Date().toISOString().slice(0, 10));
+  const isLoading = registrationsLoading || reportsLoading;
 
   const quarter = getCurrentQuarter();
   const pastQuarters = getPastQuarters(6);
@@ -106,8 +104,7 @@ export function useDashboardData(): DashboardData {
     return { cat: c, val: thisVal, delta: catDelta };
   }).filter((x) => x.val > 0);
 
-  const totalForPct =
-    catTotals.reduce((s, c) => s + c.val, 0) || 1;
+  const totalForPct = catTotals.reduce((s, c) => s + c.val, 0) || 1;
 
   const anomaly = [...catTotals]
     .filter((c) => c.delta !== null && c.delta > 25)
@@ -116,6 +113,7 @@ export function useDashboardData(): DashboardData {
   const submittedReport = reports.find((r) => r.period === quarter);
 
   return {
+    isLoading,
     registrations,
     quarter,
     prevQuarter,

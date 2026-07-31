@@ -2,13 +2,15 @@ import logging
 import os
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from sqlalchemy import text
 from typing import List, Optional
 import jwt
 
 from fastapi import FastAPI, HTTPException, Query, Request, Response, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
+from jinja2 import Environment, FileSystemLoader
 
 from .logging_config import flush_logs, setup_logging
 from .auth import create_access_token, verify_access_token, extract_bearer_token, verify_service_hmac
@@ -716,3 +718,125 @@ def unlock_report(
         raise HTTPException(status_code=404, detail="Report not found")
     logger.info("unlocked report %s", period)
     return Response(status_code=204)
+
+
+_CATEGORY_META = {
+    "restavfall":  {"label": "Restavfall",  "color": "#6b6e52"},
+    "plast":       {"label": "Plast",       "color": "#c97b5a"},
+    "papp-papir":  {"label": "Papp/papir",  "color": "#8b9eb7"},
+    "matavfall":   {"label": "Matavfall",   "color": "#6b8e4e"},
+    "metall":      {"label": "Metall",      "color": "#8a8a8a"},
+    "glass":       {"label": "Glass",       "color": "#4e8a8a"},
+    "ee-avfall":   {"label": "EE-avfall",   "color": "#a17bb3"},
+}
+
+_QUARTER_DATE_RANGES = {
+    "Q1": ("01-01", "03-31"),
+    "Q2": ("04-01", "06-30"),
+    "Q3": ("07-01", "09-30"),
+    "Q4": ("10-01", "12-31"),
+}
+
+_jinja_env = Environment(
+    loader=FileSystemLoader(str(Path(__file__).parent / "report")),
+    autoescape=True,
+)
+
+
+def _render_report_html(
+    location_id: str,
+    period: str,
+    *,
+    preview: bool,
+) -> HTMLResponse:
+    """Render the report Jinja template for a given period.
+
+    When `preview` is True, the template is rendered without requiring a
+    saved `Report` row — used to let admins preview the current quarter
+    before locking it. When False, a 404 is raised if no report exists.
+    """
+    report = data_storage.get_report(location_id, period)
+    if report is None and not preview:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    location = user_storage.get_location(location_id)
+    if location is None:
+        raise HTTPException(status_code=404, detail="Location not found")
+
+    try:
+        year, q = period.split("-")
+        date_from = f"{year}-{_QUARTER_DATE_RANGES[q][0]}"
+        date_to = f"{year}-{_QUARTER_DATE_RANGES[q][1]}"
+    except (ValueError, KeyError):
+        raise HTTPException(status_code=400, detail="Invalid period format, expected YYYY-Qn")
+
+    registrations = data_storage.list_registrations(location_id, date_from=date_from, date_to=date_to)
+
+    # Aggregate kg per category
+    totals: dict[str, float] = {}
+    for reg in registrations:
+        for entry in reg.entries:
+            totals[entry.categoryId] = totals.get(entry.categoryId, 0.0) + entry.weightKg
+
+    total_kg = sum(totals.values())
+
+    categories = []
+    for cat_id, kg in sorted(totals.items(), key=lambda x: x[1], reverse=True):
+        meta = _CATEGORY_META.get(cat_id, {"label": cat_id, "color": "#999999"})
+        categories.append({
+            "label": meta["label"],
+            "color": meta["color"],
+            "total_kg": kg,
+            "pct": (kg / total_kg * 100) if total_kg > 0 else 0,
+        })
+
+    # Build per-registration rows with resolved labels
+    reg_rows = []
+    for reg in sorted(registrations, key=lambda r: r.date, reverse=True):
+        reg_total = sum(e.weightKg for e in reg.entries)
+        entries = [
+            {
+                "label": _CATEGORY_META.get(e.categoryId, {"label": e.categoryId})["label"],
+                "weightKg": e.weightKg,
+            }
+            for e in reg.entries
+        ]
+        reg_rows.append({"date": reg.date, "entries": entries, "total_kg": reg_total})
+
+    submitted_by = report.submittedBy if report else ""
+    submitted_at_display = (report.submittedAt[:10] if report and report.submittedAt else "")
+
+    template = _jinja_env.get_template("report_template.html")
+    html = template.render(
+        period=period,
+        year=year,
+        quarter_label=q,
+        location_name=location.name,
+        total_kg=total_kg,
+        registration_count=len(registrations),
+        category_count=len(categories),
+        categories=categories,
+        registrations=reg_rows,
+        submitted_by=submitted_by,
+        submitted_at=submitted_at_display,
+        preview=preview,
+    )
+    return HTMLResponse(content=html)
+
+
+@app.get("/locations/{location_id}/reports/{period}/html", response_class=HTMLResponse)
+def get_report_html(
+    location_id: str,
+    period: str,
+    _: str = Depends(require_location_access)
+):
+    return _render_report_html(location_id, period, preview=False)
+
+
+@app.get("/locations/{location_id}/reports/{period}/preview-html", response_class=HTMLResponse)
+def get_report_preview_html(
+    location_id: str,
+    period: str,
+    _: str = Depends(require_location_access)
+):
+    return _render_report_html(location_id, period, preview=True)

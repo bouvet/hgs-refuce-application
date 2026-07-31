@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <meta charset="utf-8">
+  <title>WasteFlow — Kvartalsrapport 2026-Q1</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 20mm 18mm 20mm 18mm;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: #f4f1ea;
+      color: #2a1f15;
+      padding: 40px;
+    }
+
+    @media print {
+      body { background: #fff; padding: 0; }
+      .no-print { display: none; }
+    }
+
+    .page {
+      background: #fff;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 48px 52px;
+      border-radius: 12px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+    }
+
+    @media print {
+      .page { box-shadow: none; border-radius: 0; max-width: 100%; padding: 0; }
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 32px;
+    }
+
+    .logo-mark {
+      width: 44px;
+      height: 44px;
+      background: #3e7a3a;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-mark svg {
+      width: 26px;
+      height: 26px;
+    }
+
+    .wordmark {
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: -0.8px;
+      line-height: 1;
+      margin-top: 8px;
+    }
+
+    .wordmark span { color: #3e7a3a; }
+
+    .header-right {
+      text-align: right;
+    }
+
+    .quarter-label {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+
+    .quarter-label em { color: #3e7a3a; font-style: normal; }
+
+    .location-label {
+      font-size: 14px;
+      color: #7a6e62;
+      margin-top: 4px;
+    }
+
+    .divider {
+      border: none;
+      border-top: 2px solid #e3dccb;
+      margin: 0 0 32px 0;
+    }
+
+    /* Summary strip */
+    .summary {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 36px;
+    }
+
+    .stat-box {
+      flex: 1;
+      background: #f8f6f1;
+      border: 1px solid #e3dccb;
+      border-radius: 8px;
+      padding: 16px 20px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #7a6e62;
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #2a1f15;
+    }
+
+    .stat-unit {
+      font-size: 13px;
+      font-weight: 500;
+      color: #7a6e62;
+      margin-left: 2px;
+    }
+
+    /* Category table */
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #7a6e62;
+      margin-bottom: 14px;
+    }
+
+    .category-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 40px;
+    }
+
+    .category-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .category-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .category-name {
+      font-size: 14px;
+      font-weight: 500;
+      width: 130px;
+      flex-shrink: 0;
+    }
+
+    .bar-track {
+      flex: 1;
+      height: 10px;
+      background: #f0ece4;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 5px;
+    }
+
+    .category-weight {
+      font-size: 14px;
+      font-weight: 700;
+      width: 70px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .category-pct {
+      font-size: 12px;
+      color: #7a6e62;
+      width: 42px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* Registration log */
+    .reg-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .reg-table th {
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #7a6e62;
+      padding: 0 8px 8px 0;
+      border-bottom: 1px solid #e3dccb;
+    }
+
+    .reg-table th:last-child { text-align: right; padding-right: 0; }
+
+    .reg-table td {
+      padding: 8px 8px 8px 0;
+      border-bottom: 1px solid #f0ece4;
+      vertical-align: top;
+      color: #2a1f15;
+    }
+
+    .reg-table td:last-child { text-align: right; padding-right: 0; font-weight: 600; }
+
+    .reg-table tr:last-child td { border-bottom: none; }
+
+    .entries-inline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 2px;
+    }
+
+    .entry-chip {
+      font-size: 11px;
+      background: #f0ece4;
+      border-radius: 4px;
+      padding: 1px 6px;
+      color: #4a3f35;
+    }
+
+    /* Footer */
+    .footer {
+      margin-top: 40px;
+      padding-top: 16px;
+      border-top: 1px solid #e3dccb;
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #9a8e84;
+    }
+
+    /* Print button */
+    .print-btn {
+      display: block;
+      margin: 24px auto 0;
+      padding: 10px 28px;
+      background: #3e7a3a;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 0.1px;
+    }
+
+    .print-btn:hover { background: #2f5e2c; }
+
+    @media print {
+      .print-btn { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <div class="logo-mark">
+          <svg viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M7 22 a6 6 0 0 1 -6 -6 c0 -4 4 -8 12 -8 c0 8 -4 14 -6 14 Z M4 22 l8 -8" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="wordmark">Waste<span>Flow</span></div>
+      </div>
+      <div class="header-right">
+        <div class="quarter-label"><em>Q1</em> 2026</div>
+        <div class="location-label">Bouvet Stavanger</div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- Summary strip -->
+    <div class="summary">
+      <div class="stat-box">
+        <div class="stat-label">Total avfall</div>
+        <div class="stat-value">100.0<span class="stat-unit">kg</span></div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Registreringer</div>
+        <div class="stat-value">6</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Kategorier</div>
+        <div class="stat-value">6</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Innsendt av</div>
+        <div class="stat-value" style="font-size:16px; padding-top:4px;">inge.halvorsen</div>
+      </div>
+    </div>
+
+    <!-- Category breakdown -->
+    <div class="section-title">Fordeling per kategori</div>
+    <div class="category-list">
+      
+      <div class="category-row">
+        <div class="category-dot" style="background: #6b6e52;"></div>
+        <div class="category-name">Restavfall</div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width: 42.5%; background: #6b6e52;"></div>
+        </div>
+        <div class="category-weight">42.5 kg</div>
+        <div class="category-pct">42%</div>
+      </div>
+      
+      <div class="category-row">
+        <div class="category-dot" style="background: #6b8e4e;"></div>
+        <div class="category-name">Matavfall</div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width: 27.0%; background: #6b8e4e;"></div>
+        </div>
+        <div class="category-weight">27.0 kg</div>
+        <div class="category-pct">27%</div>
+      </div>
+      
+      <div class="category-row">
+        <div class="category-dot" style="background: #8b9eb7;"></div>
+        <div class="category-name">Papp/papir</div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width: 18.0%; background: #8b9eb7;"></div>
+        </div>
+        <div class="category-weight">18.0 kg</div>
+        <div class="category-pct">18%</div>
+      </div>
+      
+      <div class="category-row">
+        <div class="category-dot" style="background: #c97b5a;"></div>
+        <div class="category-name">Plast</div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width: 8.5%; background: #c97b5a;"></div>
+        </div>
+        <div class="category-weight">8.5 kg</div>
+        <div class="category-pct">8%</div>
+      </div>
+      
+      <div class="category-row">
+        <div class="category-dot" style="background: #8a8a8a;"></div>
+        <div class="category-name">Metall</div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width: 3.0%; background: #8a8a8a;"></div>
+        </div>
+        <div class="category-weight">3.0 kg</div>
+        <div class="category-pct">3%</div>
+      </div>
+      
+      <div class="category-row">
+        <div class="category-dot" style="background: #a17bb3;"></div>
+        <div class="category-name">EE-avfall</div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width: 1.0%; background: #a17bb3;"></div>
+        </div>
+        <div class="category-weight">1.0 kg</div>
+        <div class="category-pct">1%</div>
+      </div>
+      
+      
+    </div>
+
+    <!-- Registration log -->
+    
+    <div class="section-title">Registreringslogg</div>
+    <table class="reg-table">
+      <thead>
+        <tr>
+          <th>Dato</th>
+          <th>Kategorier</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+        <tr>
+          <td style="white-space:nowrap;">2026-03-28</td>
+          <td>
+            <div class="entries-inline">
+              
+              <span class="entry-chip">Restavfall: 9.0 kg</span>
+              
+              <span class="entry-chip">Matavfall: 6.5 kg</span>
+              
+            </div>
+          </td>
+          <td>15.5 kg</td>
+        </tr>
+        
+        <tr>
+          <td style="white-space:nowrap;">2026-03-14</td>
+          <td>
+            <div class="entries-inline">
+              
+              <span class="entry-chip">Restavfall: 11.0 kg</span>
+              
+              <span class="entry-chip">Papp/papir: 7.0 kg</span>
+              
+              <span class="entry-chip">Plast: 4.0 kg</span>
+              
+            </div>
+          </td>
+          <td>22.0 kg</td>
+        </tr>
+        
+        <tr>
+          <td style="white-space:nowrap;">2026-02-28</td>
+          <td>
+            <div class="entries-inline">
+              
+              <span class="entry-chip">Restavfall: 8.5 kg</span>
+              
+              <span class="entry-chip">Matavfall: 7.0 kg</span>
+              
+              <span class="entry-chip">Papp/papir: 4.0 kg</span>
+              
+            </div>
+          </td>
+          <td>19.5 kg</td>
+        </tr>
+        
+        <tr>
+          <td style="white-space:nowrap;">2026-02-14</td>
+          <td>
+            <div class="entries-inline">
+              
+              <span class="entry-chip">Matavfall: 8.0 kg</span>
+              
+              <span class="entry-chip">Papp/papir: 5.0 kg</span>
+              
+              <span class="entry-chip">Plast: 3.0 kg</span>
+              
+              <span class="entry-chip">Metall: 2.0 kg</span>
+              
+            </div>
+          </td>
+          <td>18.0 kg</td>
+        </tr>
+        
+        <tr>
+          <td style="white-space:nowrap;">2026-01-31</td>
+          <td>
+            <div class="entries-inline">
+              
+              <span class="entry-chip">Restavfall: 12.0 kg</span>
+              
+              <span class="entry-chip">Matavfall: 5.5 kg</span>
+              
+              <span class="entry-chip">EE-avfall: 0.5 kg</span>
+              
+            </div>
+          </td>
+          <td>18.0 kg</td>
+        </tr>
+        
+        <tr>
+          <td style="white-space:nowrap;">2026-01-15</td>
+          <td>
+            <div class="entries-inline">
+              
+              <span class="entry-chip">Restavfall: 2.0 kg</span>
+              
+              <span class="entry-chip">Matavfall: 0.5 kg</span>
+              
+              <span class="entry-chip">Papp/papir: 2.0 kg</span>
+              
+              <span class="entry-chip">Metall: 1.0 kg</span>
+              
+              <span class="entry-chip">EE-avfall: 0.5 kg</span>
+              
+              <span class="entry-chip">Plast: 1.5 kg</span>
+              
+            </div>
+          </td>
+          <td>7.0 kg</td>
+        </tr>
+        
+      </tbody>
+    </table>
+    
+
+    <!-- Footer -->
+    <div class="footer">
+      <span>WasteFlow kvartalsrapport &mdash; 2026-Q1</span>
+      <span>Innsendt 2026-04-02</span>
+    </div>
+
+  </div>
+
+  <button class="print-btn no-print" onclick="window.print()">Skriv ut / Lagre som PDF</button>
+</body>
+</html>

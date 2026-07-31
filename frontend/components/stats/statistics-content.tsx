@@ -6,13 +6,14 @@ import { DEFAULT_WASTE_CATEGORIES } from "@/lib/data/waste-categories";
 import { dateToQuarter } from "@/lib/quarters";
 import { cn } from "@/lib/utils";
 import { regsInQuarter, catVal } from "@/lib/waste-utils";
+import { StatisticsSkeleton } from "@/components/stats/statistics-skeleton";
 
 type Period = "week" | "month" | "year";
 
 const DAY_LABELS = ["søn", "man", "tir", "ons", "tor", "fre", "lør"];
 
 export function StatisticsContent() {
-  const { registrations } = useWasteRegistrations();
+  const { registrations, isLoading } = useWasteRegistrations();
   const [period, setPeriod] = useState<Period>("month");
 
   const trend = useMemo(() => {
@@ -85,6 +86,10 @@ export function StatisticsContent() {
     DEFAULT_WASTE_CATEGORIES.reduce((s, c) => s + (Number(row[c.id]) || 0), 0),
   );
   const maxLine = Math.max(...trendLine, 1);
+
+  if (isLoading) {
+    return <StatisticsSkeleton />;
+  }
 
   return (
     <div className="flex flex-col gap-3.5">

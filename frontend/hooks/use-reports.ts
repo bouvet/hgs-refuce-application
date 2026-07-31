@@ -9,11 +9,23 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 export function useReports() {
   const { user, locationId } = useCurrentUser();
   const [reports, setReports] = useState<Report[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!user?.id || !locationId) return;
     const repo = createWasteRepository(locationId);
-    repo.getReports().then(setReports);
+    let cancelled = false;
+    repo
+      .getReports()
+      .then((data) => {
+        if (!cancelled) setReports(data);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [user, locationId]);
 
   const refreshReports = useCallback(async () => {
@@ -59,5 +71,6 @@ export function useReports() {
     submitReport,
     unlockReport,
     isPeriodLocked,
+    isLoading,
   };
 }
