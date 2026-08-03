@@ -8,7 +8,23 @@ export default function RegistrerPage() {
     <>
       {/* Desktop: week grid (lg+) */}
       <div className="hidden lg:block">
-        <RegistrerContent />
+        <Suspense
+          fallback={
+            <div className="flex flex-col gap-4 max-w-5xl">
+              <div className="flex items-end gap-4">
+                <div className="flex-1 flex flex-col gap-2">
+                  <Skeleton className="h-7 w-48" />
+                  <Skeleton className="h-4 w-80" />
+                </div>
+                <Skeleton className="h-9 w-80 rounded-[9px]" />
+              </div>
+              <Skeleton className="h-96 rounded-2xl" />
+              <Skeleton className="h-12 w-40 rounded-xl self-end" />
+            </div>
+          }
+        >
+          <RegistrerContent />
+        </Suspense>
       </div>
 
       {/* Mobile: single-day form (<lg) */}
