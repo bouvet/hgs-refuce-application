@@ -782,6 +782,8 @@ def _render_report_html(
 
     categories = []
     for cat_id, kg in sorted(totals.items(), key=lambda x: x[1], reverse=True):
+        if kg <= 0:
+            continue
         meta = _CATEGORY_META.get(cat_id, {"label": cat_id, "color": "#999999"})
         categories.append({
             "label": meta["label"],
