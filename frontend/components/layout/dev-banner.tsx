@@ -14,7 +14,7 @@ function subscribeDebugMode(callback: () => void): () => void {
 }
 
 function getDebugSnapshot(): boolean {
-  return window.localStorage.getItem("boss-app:debug-mode") === "true";
+  return window.localStorage.getItem("WasteFlow:debug-mode") === "true";
 }
 
 export function DevBanner() {
