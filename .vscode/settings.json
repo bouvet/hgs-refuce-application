@@ -1,6 +1,0 @@
-{
-  "files.associations": {
-    "**/backend_fast_api/**/*.html": "jinja-html"
-  },
-  "liveServer.settings.port": 5501
-}
