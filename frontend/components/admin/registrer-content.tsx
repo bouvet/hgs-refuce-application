@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
@@ -55,8 +56,10 @@ type WeightGrid = Record<string, Record<string, string>>;
 export function RegistrerContent() {
   const { user, locationId } = useCurrentUser();
   const { isPeriodLocked } = useReports();
+  const searchParams = useSearchParams();
+  const datoParam = searchParams.get("dato");
   const today = new Date().toISOString().slice(0, 10);
-  const [selectedDate, setSelectedDate] = useState(today);
+  const [selectedDate, setSelectedDate] = useState(datoParam ?? today);
   const [weights, setWeights] = useState<WeightGrid>({});
   const [savedSnapshot, setSavedSnapshot] = useState<WeightGrid>({});
   const [regsByDate, setRegsByDate] = useState<

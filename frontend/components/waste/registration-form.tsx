@@ -18,6 +18,7 @@ import { DEFAULT_WASTE_CATEGORIES } from "@/lib/data/waste-categories";
 import { createWasteRepository } from "@/lib/data/waste-repository";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useReports } from "@/hooks/use-reports";
+import { Skeleton } from "@/components/ui/skeleton";
 import { dateToQuarter, quarterLabel } from "@/lib/quarters";
 import type { WasteRegistration } from "@/lib/types";
 
@@ -47,7 +48,7 @@ function prevDateOf(ds: string): string {
 
 export function RegistrationForm() {
   const { user, locationId } = useCurrentUser();
-  const { isPeriodLocked } = useReports();
+  const { isPeriodLocked, isLoading: reportsLoading } = useReports();
   const searchParams = useSearchParams();
   const datoParam = searchParams.get("dato");
 
@@ -177,6 +178,16 @@ export function RegistrationForm() {
   const prevTotalKg = prevReg
     ? prevReg.entries.reduce((s, e) => s + e.weightKg, 0)
     : 0;
+
+  if (reportsLoading) {
+    return (
+      <div className="flex flex-col gap-4 max-w-lg mx-auto pb-4">
+        <Skeleton className="h-10 rounded-xl" />
+        <Skeleton className="h-64 rounded-2xl" />
+        <Skeleton className="h-14 rounded-2xl" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-0 max-w-lg mx-auto pb-4">

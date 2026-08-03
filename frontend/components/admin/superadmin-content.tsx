@@ -717,8 +717,7 @@ export function SuperAdminContent() {
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
               SSO-pålogginger fra ukjente e-postadresser havner her. Godkjenn
-              for å opprette en backend-bruker, eller avvis for å fjerne
-              forespørselen.
+              for å opprette en bruker, eller avvis for å fjerne forespørselen.
             </p>
 
             {loadingRequests && (
