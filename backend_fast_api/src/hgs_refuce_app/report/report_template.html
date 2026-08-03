@@ -420,7 +420,9 @@
             ></div>
           </div>
           <div class="category-weight">
-            {{ "%.1f"|format(cat.total_kg) }} kg
+            {% if cat.total_kg > 0 %}
+              {{ "%.1f"|format(cat.total_kg) }} kg
+            {% endif %}
           </div>
           <div class="category-pct">{{ "%.0f"|format(cat.pct) }}%</div>
         </div>
