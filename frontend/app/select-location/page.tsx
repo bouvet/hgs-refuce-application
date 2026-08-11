@@ -7,15 +7,18 @@ import {
   resolveAndPersistBackendUserId,
 } from "@/lib/server-currentUser";
 import { LocationPicker } from "./location-picker";
+import { LogoutLink } from "./logout-link";
 
 function CenteredNotice({
   title,
   body,
   withIcon = false,
+  withLogoutLink = false,
 }: {
   title: string;
   body: string;
   withIcon?: boolean;
+  withLogoutLink?: boolean;
 }) {
   return (
     <main className="flex flex-col flex-1 items-center justify-center min-h-screen bg-background px-4">
@@ -27,6 +30,7 @@ function CenteredNotice({
         )}
         <h1 className="text-xl font-semibold">{title}</h1>
         <p className="text-sm text-muted-foreground">{body}</p>
+        {withLogoutLink && <LogoutLink />}
       </div>
     </main>
   );
@@ -51,6 +55,8 @@ export default async function SelectLocationPage() {
   if (!backendUserId) {
     return (
       <CenteredNotice
+        withIcon
+        withLogoutLink
         title="Venter på godkjenning"
         body="Din forespørsel om tilgang er sendt. En administrator må godkjenne deg før du kan logge inn. Prøv å oppdatere siden om litt."
       />
@@ -63,6 +69,8 @@ export default async function SelectLocationPage() {
   if (!currentUser) {
     return (
       <CenteredNotice
+        withIcon
+        withLogoutLink
         title="Bruker ikke klargjort"
         body="Klarte ikke å hente brukeren din fra backend. Prøv igjen senere eller kontakt en administrator."
       />
@@ -73,6 +81,7 @@ export default async function SelectLocationPage() {
     return (
       <CenteredNotice
         withIcon
+        withLogoutLink
         title="Ingen lokasjoner"
         body="Du er ikke knyttet til noen lokasjon ennå. Kontakt en administrator."
       />
