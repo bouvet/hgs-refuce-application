@@ -6,7 +6,7 @@ nav_order: 1
 
 # HGS Refuce Application
 
-Documentation for the HGS Refuce Application — a waste/refuse tracking system for a local Bouvet office. Users register waste by type and weight against a location; each quarter is closed off by submitting a report, which locks that quarter against further edits.
+Documentation for the HGS Refuce Application — a waste/refuse tracking system for local Bouvet offices. Users register waste by type and weight against a location; each quarter is closed off by submitting a report, which locks that quarter against further edits.
 
 The project is a monorepo with two independently deployable parts:
 
