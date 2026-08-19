@@ -1,4 +1,11 @@
-# Deployment Guide: FastAPI Backend to Azure App Service
+---
+title: Azure Deployment — Backend
+layout: default
+parent: Deployment
+nav_order: 3
+---
+
+# Azure Deployment — Backend
 
 Your project structure:
 ```
@@ -224,8 +231,6 @@ When prompted, enter the PostgreSQL password.
 
 **Action:**
 ```bash
-cd /mnt/c/Users/inge.halvorsen/development/Internal/hgs-refuce-application
-
 git add .github/workflows/deploy-backend.yml backend_fast_api/startup.sh
 git commit -m "Add GitHub Actions deployment workflow for FastAPI backend"
 git push origin main

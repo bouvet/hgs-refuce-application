@@ -13,15 +13,8 @@ Each sub-project has its own `CLAUDE.md` with detailed guidance. Read those befo
 
 ## Starting both services
 
-Three scripts at the repo root start the backend and frontend together. All require a `.venv` in `backend_fast_api/` — if it's missing they will print setup instructions and exit.
-
-| Script      | Platform             |
-| ----------- | -------------------- |
-| `start.bat` | Windows (cmd)        |
-| `start.ps1` | Windows (PowerShell) |
-| `start.sh`  | bash / WSL           |
-
-One-time setup before first run:
+There is no combined start script — run the backend and frontend in separate terminals (see
+Commands below). One-time setup before first run:
 
 ```bash
 python -m venv backend_fast_api/.venv
@@ -41,7 +34,7 @@ pip install -r backend_fast_api/requirements.txt
 pip install -r requirements.txt
 uvicorn hgs_refuce_app.main:app --reload   # dev server
 pytest                                      # all tests
-pytest tests/test_endpoints.py::test_add_and_get_datapoint  # single test
+pytest tests/test_endpoints.py::test_create_and_get_registration  # single test
 ```
 
 ### Frontend (`frontend/`)
@@ -64,15 +57,11 @@ The backend is the authority on data shape and on roles/location membership. The
 
 ### Backend
 
-- `src/hgs_refuce_app/main.py` — FastAPI app; default port 8000, CORS origins controlled by `BACKEND_CORS_ORIGINS` env var (defaults to `http://localhost:3000`)
-  - `POST /auth/login` — authenticate a user
-  - `GET/POST /locations` — list user's locations or create one (super-admin)
-  - `GET/POST /locations/{id}/registrations` — list/create waste registrations for a location
-  - `GET/PUT/DELETE /locations/{id}/registrations/{id}` — get, update, delete a registration
-  - `GET/POST /locations/{id}/reports` — list/submit a quarterly report (locks that quarter)
-  - `GET/DELETE /locations/{id}/reports/{period}` — get or delete (unlock) a report
-  - `GET/POST/DELETE /users`, `/locations/{id}/users` — user management (admin)
-  - `GET/POST /admin/locations`, `/admin/users` — developer-only endpoints (require `ADMIN_SECRET` header)
+- `src/hgs_refuce_app/main.py` — FastAPI app; default port 8000, CORS origins controlled by `BACKEND_CORS_ORIGINS` env var (defaults to `http://localhost:3000`). All routes live in this one file (no `APIRouter` split).
+  - Endpoint list is generated from `app.openapi()`, not hand-maintained here — see
+    [the API reference](https://bouvet.github.io/hgs-refuce-application/backend/api-reference/)
+    (regenerate with `python scripts/gen_openapi_docs.py`, documented in
+    `.claude/skills/update-api-reference/SKILL.md`).
 - `src/hgs_refuce_app/storage.py` — `DatabaseConnection`, `UserStorage`, `DataStorage` classes using SQLAlchemy (SQLite dev / PostgreSQL prod)
 - `src/hgs_refuce_app/models.py` — Pydantic models: `WasteRegistration`, `Report`, `Location`, `User`, etc.
 
@@ -81,7 +70,7 @@ Tests use FastAPI's `TestClient` against the live app instance and clear the DB 
 ### Frontend
 
 - **Auth**: **Better Auth 1.6** (`frontend/lib/auth.ts`) in Next.js with its own Postgres tables. Two sign-in paths:
-  - **Microsoft SSO** via the built-in `microsoft` social provider (Entra ID); on first sign-in, a `databaseHooks.user.create.before` hook calls `POST /auth/sso-resolve` on FastAPI to mirror role + preferred location onto the BA user.
+  - **Microsoft SSO** via the built-in `microsoft` social provider (Entra ID); on first sign-in, a `databaseHooks.user.create.before` hook calls `POST /auth/sso-resolve` on FastAPI to resolve the stable `backendUserId` for that email. Only the id is persisted on the Better Auth user — role and location are never mirrored, and are instead fetched live from FastAPI on every request.
   - **Username + PIN** via a custom plugin (`lib/auth-plugins/pin-credentials.ts`) that proxies credentials to FastAPI `POST /auth/login` and creates a BA session on success.
   - Three roles: `user` | `admin` | `superadmin`. Server-side authorisation via `requireSession()` / `requireRole()` in `lib/server-session.ts`. No client-side guards.
   - The `/api/[...path]` proxy and `proxy.ts` (Next 16 name for middleware) enforce the session; `proxy.ts` is **optimistic only** — real checks happen in the route handler and RSCs.

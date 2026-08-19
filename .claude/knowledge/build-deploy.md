@@ -8,20 +8,18 @@ related: [backend-api, frontend-architecture]
 ## project structure
 
 - OWNS: monorepo with backend_fast_api/ and frontend/ as independent subprojects
-- OWNS: root-level start scripts (start.sh, start.ps1, start.bat)
 - INVARIANT: each subproject has its own CLAUDE.md, requirements/package.json, Dockerfile
 - DECIDED: monorepo layout allows parallel development; each sub-project can be deployed independently
 
 ## startup scripts
 
-- OWNS: start.sh (bash/WSL), start.ps1 (PowerShell), start.bat (cmd)
-- OWNS: venv check, pip install, uvicorn + npm dev server startup
-- READS FROM: backend_fast_api/.venv
-- WRITES TO: spawns two processes (backend on 8000, frontend on 3000)
-- INVARIANT: all scripts check for .venv and print setup instructions if missing
+- TENSION: `start.sh`/`start.ps1`/`start.bat` were documented (CLAUDE.md, README.md, this file) as
+  root-level convenience scripts that check `.venv` and spawn both services — verified 2026-08 that
+  none of the three files exist in the working tree, and `git log --all` shows no commit ever added
+  them. Removed from CLAUDE.md/README.md/docs as part of the 2026-08 documentation overhaul; start
+  each service manually (see below) until/unless someone actually adds the scripts.
 - INVARIANT: requires one-time: `python -m venv backend_fast_api/.venv && pip install -r backend_fast_api/requirements.txt`
-- FLOW[startup]: user runs start.sh → check .venv → pip install → spawn uvicorn (8000) + next dev (3000) → ready for http://localhost:3000
-- DECIDED: shell scripts for convenience; developer can also run components separately
+- FLOW[startup]: `cd backend_fast_api && uvicorn hgs_refuce_app.main:app --reload --port 8000` (terminal 1) + `cd frontend && npm run dev` (terminal 2) → http://localhost:3000
 
 ## backend dev
 
@@ -95,3 +93,27 @@ related: [backend-api, frontend-architecture]
 - INVARIANT: client secret has an expiry — add to renewal calendar and rotate by replacing `MICROSOFT_CLIENT_SECRET` (no code change)
 - INVARIANT: `MICROSOFT_TENANT_ID` scopes the sign-in to a specific Entra tenant; use `common` if multi-tenant
 - DECIDED: Microsoft is the SSO provider (per requirements). Other providers can be added by extending `socialProviders` in `lib/auth.ts`.
+
+## documentation site
+
+- OWNS: `docs/` — a Jekyll + just-the-docs site, published by GitHub Pages via **branch-source**
+  deploy (`main` branch, `/docs` folder). Confirmed via the Actions tab showing the implicit
+  `pages-build-deployment` run; there is no workflow file for it, and none is needed.
+- DECIDED: user-facing documentation lives in `docs/` as this Jekyll site — **not** as loose
+  root-level `.md` files. The repo previously accumulated ~16 overlapping root `.md` files (Docker
+  setup notes, status artifacts, one-off post-mortems) written as ad-hoc AI artifacts; those were
+  consolidated into `docs/` or deleted. Root `.md` files are no longer a documentation location —
+  new documentation goes in `docs/` via the `write-docs` skill.
+- DECIDED: the backend API reference (`docs/backend/api-reference.md`, `openapi.json`,
+  `api-explorer.html`) is generated from `app.openapi()` by `scripts/gen_openapi_docs.py`, never
+  hand-maintained. Regenerate with the `update-api-reference` skill after any route change.
+- INVARIANT: `docs/_config.yml` must keep `url: "https://bouvet.github.io"` and
+  `baseurl: "/hgs-refuce-application"` — removing either breaks just-the-docs' CSS/JS/search-index
+  asset resolution (they resolve to `/assets/...` instead of `/hgs-refuce-application/assets/...`
+  and 404) and every `{{ site.baseurl }}`-prefixed internal link in the site.
+- INVARIANT: the branch-source Pages build only builds `main` — changes on any other branch (e.g.
+  `make-documentation`) do not appear on `https://bouvet.github.io/hgs-refuce-application/` until
+  merged.
+- TENSION: `docs/README.md`'s local-preview instructions require Ruby + Bundler, which is not part
+  of this repo's normal Python/Node toolchain — verify the Jekyll build locally only when changing
+  `_config.yml`, the theme, or navigation structure; day-to-day page edits don't need it.

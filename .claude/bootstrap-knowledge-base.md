@@ -16,7 +16,7 @@
 The knowledge system has **four tiers**, in priority order:
 
 | Tier | Location                  | Loading       | Purpose                                                                |
-| ---- | ------------------------- | ------------- | ---------------------------------------------------------------------- |
+| ---- | ------------------------- | ------------- | ------------------------------------------------------------------------ |
 | 1    | `copilot-instructions.md` | Always loaded | Project overview, navigation hub, hard constraints, links to tiers 2–4 |
 | 2    | `instructions/*.md`       | Auto by glob  | Conventions/rules per file type — **prescriptive** (how to work)       |
 | 3    | `knowledge/*.md`          | On demand     | Living mental model — **descriptive** (how it works & why)             |

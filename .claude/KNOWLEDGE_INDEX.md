@@ -9,7 +9,7 @@ This index provides an overview of the project's externalized mental model. Read
 - FastAPI application structure and endpoints
 - Auth, locations, registrations, reports, admin endpoints
 - Route definitions and request/response flows
-- 11 entries (OWNS, READS FROM, WRITES TO, INVARIANT, FLOW, TENSION, DECIDED)
+- 64 entries (OWNS, READS FROM, WRITES TO, INVARIANT, FLOW, TENSION, DECIDED)
 
 ### 2. Database Layer (`database-layer.md`)
 
@@ -17,14 +17,14 @@ This index provides an overview of the project's externalized mental model. Read
 - DatabaseConnection, UserStorage, DataStorage
 - Schema definitions (User, Location, WasteRegistration, Report)
 - Database queries and test setup
-- 12 entries
+- 49 entries
 
 ### 3. Frontend Architecture (`frontend-architecture.md`)
 
 - Next.js 16 App Router routing structure
 - Page organization (server page.tsx + client \*-content.tsx)
 - Layouts, environment variables, build setup
-- 9 entries
+- 53 entries
 
 ### 4. Component Structure (`component-structure.md`)
 
@@ -32,7 +32,7 @@ This index provides an overview of the project's externalized mental model. Read
 - UI components, providers, admin/waste/stats/layout components
 - Server/client component separation
 - Tailwind CSS and shadcn/UI usage
-- 10 entries
+- 58 entries
 
 ### 5. Data Repository Pattern (`data-repository.md`)
 
@@ -40,7 +40,7 @@ This index provides an overview of the project's externalized mental model. Read
 - BackendWasteRepository HTTP client
 - Singleton pattern and data types
 - Error handling and caching considerations
-- 8 entries
+- 38 entries
 
 ### 6. Auth & RBAC (`auth-rbac.md`)
 
@@ -50,6 +50,7 @@ This index provides an overview of the project's externalized mental model. Read
 - Server-side guards (`requireSession`, `requireRole`); no client-side `RoleGuard`
 - HMAC-signed identity header on every backend call from the Next.js proxy
 - Rewritten 2026-06; many `DECIDED` entries reverse the prior localStorage-era model
+- 90 entries
 
 ### 7. Build & Deployment (`build-deploy.md`)
 
@@ -57,9 +58,12 @@ This index provides an overview of the project's externalized mental model. Read
 - Backend dev (uvicorn, pytest) and frontend dev (Turbopack)
 - Docker and CI/CD setup
 - Environment variables and configuration
-- 8 entries
+- The `docs/` Jekyll documentation site (Pages branch-source deploy, generated API reference)
+- 61 entries
 
-**Total: 67 entries across 7 domains**
+**Total: 413 entries across 7 domains** (recounted 2026-08 during the documentation overhaul —
+the previous per-file counts here had drifted badly; recount periodically rather than trusting
+these numbers indefinitely).
 
 ## Instruction Files
 
@@ -81,6 +85,26 @@ This index provides an overview of the project's externalized mental model. Read
 - Classify lessons learned (fix vs. document)
 - Decide where to record: knowledge / instructions / skills / code comments
 - Apply changes and reference in commits
+
+### Write Docs (`skills/write-docs/SKILL.md`)
+
+- Author or update a page on the `docs/` Jekyll site
+- Read gate: knowledge file + real source before writing; check for an existing page first
+- Correct front matter (`parent`, `nav_order`), `{{ site.baseurl }}` links, cross-linking
+- Note any newly discovered invariant in the knowledge base (write gate)
+
+### Docs Audit (`skills/docs-audit/SKILL.md`)
+
+- Detect drift between `docs/` and the working tree (stale paths, dead endpoints, broken links)
+- Extract verifiable claims and check each against the code, `package.json`, `.env.example`, `docker-compose.yml`
+- Validate `parent:`/`nav_order` structure and internal link resolution
+- Report findings as a table; fix only when asked
+
+### Update API Reference (`skills/update-api-reference/SKILL.md`)
+
+- Regenerate `docs/backend/{openapi.json,api-reference.md,api-explorer.html}` from `app.openapi()`
+- Run `scripts/gen_openapi_docs.py`, diff the output, summarize route/model changes
+- Flag prose pages referencing a changed endpoint for a `write-docs` follow-up
 
 ## How to Use
 

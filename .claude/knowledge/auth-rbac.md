@@ -95,6 +95,7 @@ related:
 - INVARIANT: any non-2xx from FastAPI, and any adapter failure (e.g. `backendUserId` unique-constraint collision), throws `new APIError("UNAUTHORIZED", { message: "Invalid username or PIN" })` — generic, never leaks whether the username exists, and never surfaces a raw 500
 - INVARIANT: `signIn.pin` returns `{ data, error }` (Better Auth does not throw on 4xx); the client (`login-form.tsx`) must check `result.error` and NOT navigate on failure
 - INVARIANT: `adapter.createSession(userId)` — only first positional arg is the userId; second positional is `dontRememberMe: boolean`, NOT the endpoint ctx (this was a real bug caught by `tsc`)
+- INVARIANT: the `auth-db` Postgres database must have the Better Auth schema (`user`, `session`, `account`, `verification` tables) initialized before PIN (or SSO) sign-in can succeed — without those tables, `adapter.createUser`/`createSession` throw, and because of the generic-error invariant above, this surfaces as the same "Invalid username or PIN" message as an actually-wrong PIN. In Docker Compose this schema is created by `scripts/init-better-auth-schema.sql` mounted into `auth-db`'s init directory; if `auth-db`'s volume already existed from a prior run without that script, the init step is skipped and sign-in silently fails this way.
 - DECIDED: PIN plugin keeps FastAPI as the credential authority (no password rewrite) while letting Better Auth own session/cookie/rate-limit/CSRF. Clean separation.
 
 ## auth-client export pattern

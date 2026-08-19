@@ -9,10 +9,10 @@ related: [backend-api, auth-rbac]
 
 - OWNS: SQLAlchemy engine initialization, session management
 - OWNS: SQLite dev connection vs PostgreSQL prod connection
-- READS FROM: environment variable DATABASE_URL (or defaults to `sqlite:///db.sqlite`)
-- WRITES TO: creates tables via `Base.metadata.create_all()`
+- READS FROM: environment variable `DATABASE_URL` (or defaults to `sqlite:///data.db`; required in production — `main.py` raises at import time if `APP_ENV=production` and `DATABASE_URL` is unset)
+- WRITES TO: creates tables via raw `CREATE TABLE IF NOT EXISTS` statements in `DatabaseConnection._init_schema()` — there is no declarative SQLAlchemy `Base`/ORM model layer. (Corrected 2026-08.)
 - INVARIANT: SQLite used locally; PostgreSQL used in production
-- INVARIANT: all schema defined in models.py; apply_migrations() not called
+- INVARIANT: schema lives in `storage.py::_init_schema`, not `models.py` (which holds only the Pydantic request/response models); ad-hoc `ALTER TABLE ... ADD COLUMN` migrations run guarded by try/except for re-runs (e.g. `preferred_location_id`, `name` on `users`)
 - DECIDED: SQLite for local dev with simple db reset between tests; PostgreSQL mirrored schema in prod
 
 ## UserStorage
@@ -47,10 +47,10 @@ related: [backend-api, auth-rbac]
 - OWNS: User, Location, WasteRegistration, Report, Membership (schemas + ORM)
 - OWNS: field definitions (required vs optional, default values)
 - OWNS: relationships (User.locations, Location.registrations, Location.reports)
-- INVARIANT: WasteRegistration has type (waste category), kg (amount), date, notes
-- INVARIANT: Report has period (YYYY-Qn), location_id, locked boolean
-- INVARIANT: User has email, password, role; Location has name, address, users (many-to-many)
-- TENSION: both Pydantic (request/response) and SQLAlchemy (ORM) models exist; duplication risk on schema changes
+- INVARIANT: `WasteRegistration` is `{id, date, entries: [{categoryId, weightKg}], createdAt, updatedAt, createdBy}` — NOT a flat `type`/`kg`/`notes` shape; one registration can carry multiple category entries. (Corrected 2026-08; verified against `models.py`.)
+- INVARIANT: `Report` is `{id, period, submittedAt, submittedBy}` — there is no `locked` boolean column. A quarter is "locked" purely by the existence of a `Report` row for that `location_id`+`period`; `data_storage.is_date_locked()` checks for that row, it doesn't read a flag. (Corrected 2026-08.)
+- INVARIANT: `User` has id, isAdmin, isSuperAdmin, password (nullable — absent for SSO users), name (optional), preferred_location_id. `Location` has id, name, createdAt — **no `address` field**. (Corrected 2026-08.)
+- TENSION: both Pydantic (request/response) and SQLAlchemy (ORM) models exist; duplication risk on schema changes — in practice there is no separate ORM model layer here, `storage.py` maps raw SQL rows to the Pydantic models directly (no declarative `Base`/`Base.metadata.create_all()`; schema is raw `CREATE TABLE IF NOT EXISTS` in `DatabaseConnection._init_schema`). (Corrected 2026-08 — this file previously implied a declarative ORM layer.)
 
 ## Database queries
 
