@@ -7,14 +7,12 @@ has_children: true
 
 # Deployment
 
-The repo root has several Docker- and Azure-related notes (`DOCKER_*.md`,
-`AZURE_DEPLOYMENT_FRONTEND.md`, `BACKEND_DEPLOY_INSTRUCTIONS.md`) that cover current build and
-deploy details in depth — this section is a placeholder for a consolidated version of that
-content.
+How this app runs outside your own machine: containerized locally, deployed to Azure, and how this
+docs site itself gets published.
 
-## Topics to cover here
-
-- Docker build/run for backend and frontend
-- CI/CD (`.github/workflows/main_wasteflow.yml`)
-- Environment variables per environment (dev / prod)
-- Azure deployment steps
+| Page | Covers |
+| --- | --- |
+| [Docker]({{ site.baseurl }}/deployment/docker/) | The local `docker-compose.yml` stack, the two Postgres databases, troubleshooting |
+| [Azure — Frontend]({{ site.baseurl }}/deployment/azure-frontend/) | Deploying the Next.js app |
+| [Azure — Backend]({{ site.baseurl }}/deployment/azure-backend/) | Deploying the FastAPI app |
+| [CI/CD]({{ site.baseurl }}/deployment/ci-cd/) | The two GitHub Actions workflows, and how this Pages site publishes (no workflow file) |

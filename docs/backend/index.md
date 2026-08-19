@@ -7,32 +7,15 @@ has_children: true
 
 # Backend
 
-Python + FastAPI + SQLAlchemy (SQLite locally, PostgreSQL in production).
+Python + FastAPI + SQLAlchemy (SQLite locally, PostgreSQL in production). All 34 routes live in one
+file, `src/hgs_refuce_app/main.py` — there is no `APIRouter` split.
 
-## Key files
+| Page | Covers |
+| --- | --- |
+| [Project structure]({{ site.baseurl }}/backend/project-structure/) | `main.py` / `storage.py` / `models.py` responsibilities |
+| [API reference]({{ site.baseurl }}/backend/api-reference/) | Generated route table (grouped by domain) — never hand-maintained |
+| [Database]({{ site.baseurl }}/backend/database/) | `DatabaseConnection`, `UserStorage`, `DataStorage`; SQLite vs PostgreSQL |
+| [Testing]({{ site.baseurl }}/backend/testing/) | `TestClient`, `setup_function()` DB reset, running a single test |
 
-- `src/hgs_refuce_app/main.py` — FastAPI app; default port 8000, CORS origins controlled by
-  `BACKEND_CORS_ORIGINS` env var (defaults to `http://localhost:3000`)
-- `src/hgs_refuce_app/storage.py` — `DatabaseConnection`, `UserStorage`, `DataStorage` classes
-- `src/hgs_refuce_app/models.py` — Pydantic models: `WasteRegistration`, `Report`, `Location`, `User`, etc.
-
-## Endpoints
-
-- `POST /auth/login` — authenticate a user
-- `GET/POST /locations` — list user's locations or create one (super-admin)
-- `GET/POST /locations/{id}/registrations` — list/create waste registrations for a location
-- `GET/PUT/DELETE /locations/{id}/registrations/{id}` — get, update, delete a registration
-- `GET/POST /locations/{id}/reports` — list/submit a quarterly report (locks that quarter)
-- `GET/DELETE /locations/{id}/reports/{period}` — get or delete (unlock) a report
-- `GET/POST/DELETE /users`, `/locations/{id}/users` — user management (admin)
-- `GET/POST /admin/locations`, `/admin/users` — developer-only endpoints (require `ADMIN_SECRET` header)
-
-## Testing
-
-Tests use FastAPI's `TestClient` against the live app instance and clear the DB with
-`setup_function()` between tests.
-
-```bash
-pytest
-pytest tests/test_endpoints.py::test_add_and_get_datapoint  # single test
-```
+CORS origins are controlled by the `BACKEND_CORS_ORIGINS` env var (defaults to
+`http://localhost:3000`); see [Environment variables]({{ site.baseurl }}/getting-started/environment-variables/).

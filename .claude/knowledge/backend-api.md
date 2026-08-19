@@ -25,7 +25,7 @@ related: [database-layer, auth-rbac, data-repository]
 - READS FROM: request body — `/auth/login` `{ username, password }`; `/auth/sso-resolve` `{ email, name? }`
 - WRITES TO: `/auth/login` returns `User { id, isAdmin, isSuperAdmin }`; `/auth/sso-resolve` returns `{ backendUserId, role }`
 - INVARIANT: role is normalized to `user | admin | superadmin` via `_role_for(user)` (`superadmin` if `isSuperAdmin`, else `admin` if `isAdmin`, else `user`)
-- INVARIANT: `/auth/sso-resolve` looks up the user by email (the backend user id) and 404s if not provisioned — it does NOT auto-create users
+- INVARIANT: `/auth/sso-resolve` always returns 200. It looks up the user by email; if found, returns `{status: "resolved", backendUserId, role}`. If not found, it does NOT auto-create the user and does NOT 404 — it queues a `PendingAccessRequest` row (`user_storage.upsert_pending_request`) for a superadmin to approve via `/admin/access-requests`, and returns `{status: "pending"}`. (Corrected 2026-08 — this file previously said it 404s; verified against `main.py::sso_resolve`.)
 - DECIDED: no token generation; the session lives in Better Auth, the backend authenticates each request via the signed `X-User-Id` header
 
 ## currentUser endpoints
@@ -79,6 +79,15 @@ related: [database-layer, auth-rbac, data-repository]
 - WRITES TO: Location and User records (developer overrides)
 - INVARIANT: ADMIN_SECRET must match env var exactly; no hashing
 - DECIDED: admin endpoints exist for local testing; never expose in production
+
+## pending access requests
+
+- OWNS: GET /admin/access-requests (list), DELETE /admin/access-requests/{email} (dismiss)
+- READS FROM: super-admin auth via `require_super_admin`
+- WRITES TO: `PendingAccessRequest` rows created by `/auth/sso-resolve` for unknown emails
+- INVARIANT: dismissing a request just deletes the row (404 if already gone) — it does not block the email from retrying SSO later
+- FLOW[sso-first-contact]: unknown Entra email signs in → `/auth/sso-resolve` queues a pending request → superadmin reviews via `/admin/access-requests` → provisions the user with `POST /users` (which clears the matching pending row) or dismisses it
+- DECIDED (2026-08, discovered during docs work): this endpoint pair existed in code but was undocumented here — added per the write gate.
 
 ## auth integration with Better Auth
 

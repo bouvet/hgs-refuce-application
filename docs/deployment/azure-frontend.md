@@ -1,4 +1,11 @@
-# Azure Deployment Guide: Next.js Frontend to Azure App Service
+---
+title: Azure Deployment — Frontend
+layout: default
+parent: Deployment
+nav_order: 2
+---
+
+# Azure Deployment — Frontend
 
 Complete step-by-step guide to deploy the `hgs-refuce-application` frontend (Next.js 16) from GitHub to Azure Web App.
 

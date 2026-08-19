@@ -3,12 +3,18 @@
 This folder is a Jekyll site (theme: [just-the-docs](https://just-the-docs.com/)) published via
 GitHub Pages.
 
-## Enable Pages (one-time, in the GitHub repo)
+## Pages configuration (confirmed)
 
-Settings → Pages → Build and deployment → Source: **Deploy from a branch** → Branch: `main`,
-folder: **/docs**.
+GitHub Pages is enabled with **source: "Deploy from a branch"** → branch `main`, folder **/docs**
+(Settings → Pages → Build and deployment). There is no workflow file for this — the Actions tab
+shows GitHub's own implicit `pages-build-deployment` run on every push to `main` that touches
+`docs/`. See [Deployment → CI/CD](https://bouvet.github.io/hgs-refuce-application/deployment/ci-cd/).
 
-The site will be published at `https://<org>.github.io/<repo>/`.
+The site is published at **https://bouvet.github.io/hgs-refuce-application/**.
+
+{: .important }
+> The branch source only builds `main`. Changes on any other branch — including this one before
+> it merges — are not live.
 
 ## Preview locally
 
@@ -17,9 +23,13 @@ Requires Ruby + Bundler.
 ```bash
 cd docs
 bundle install
-bundle exec jekyll serve
-# http://localhost:4000
+bundle exec jekyll serve --baseurl /hgs-refuce-application
+# http://localhost:4000/hgs-refuce-application/
 ```
+
+Pass `--baseurl` explicitly so local paths match production (`docs/_config.yml` sets
+`baseurl: "/hgs-refuce-application"` — omitting the flag serves correctly but some editors/tools
+expect it passed at the CLI too).
 
 ## Adding a page
 
