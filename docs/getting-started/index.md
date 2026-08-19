@@ -7,51 +7,29 @@ has_children: true
 
 # Getting Started
 
+Everything you need to get the application running on your own machine.
+
+There are two ways to run it locally:
+
+| Approach | Best for | Page |
+| --- | --- | --- |
+| **Native** — venv + npm, SQLite | Day-to-day development, fast reloads | [Installation]({{ site.baseurl }}/getting-started/installation/) → [Running locally]({{ site.baseurl }}/getting-started/running-locally/) |
+| **Docker Compose** — full stack, two Postgres databases | Reproducing production-like behaviour, testing SSO | [Running with Docker]({{ site.baseurl }}/getting-started/with-docker/) |
+
+Whichever you choose, read [Environment variables]({{ site.baseurl }}/getting-started/environment-variables/) first — the single most common cause of a broken local setup is `BACKEND_SHARED_SECRET` not matching between the backend and the frontend.
+
 ## Prerequisites
 
-- Python 3.11+ (backend)
-- Node.js 20+ (frontend)
+- **Python 3.11+** — backend
+- **Node.js 20+** (24 is what the Docker images and CI use) — frontend
+- **Docker Desktop** — only for the Compose workflow
+- **PostgreSQL** — only if running Better Auth natively without Docker
 
-## One-time setup
+## Ports
 
-```bash
-python -m venv backend_fast_api/.venv
-
-# Windows
-backend_fast_api\.venv\Scripts\activate
-
-# bash / WSL
-source backend_fast_api/.venv/bin/activate
-
-pip install -r backend_fast_api/requirements.txt
-```
-
-## Running both services
-
-Three scripts at the repo root start the backend and frontend together. All require the `.venv` above.
-
-| Script      | Platform             |
-| ----------- | --------------------- |
-| `start.bat` | Windows (cmd)          |
-| `start.ps1` | Windows (PowerShell)  |
-| `start.sh`  | bash / WSL             |
-
-## Running services individually
-
-### Backend
-
-```bash
-cd backend_fast_api
-pip install -r requirements.txt
-uvicorn hgs_refuce_app.main:app --reload   # dev server, http://localhost:8000
-pytest                                      # all tests
-```
-
-### Frontend
-
-```bash
-cd frontend
-npm run dev     # dev server, http://localhost:3000 (Turbopack)
-npm run build   # production build
-npm run lint    # ESLint
-```
+| Service | Port |
+| --- | --- |
+| Frontend (Next.js) | 3000 |
+| Backend (FastAPI) | 8000 |
+| Better Auth Postgres (`auth-db`, Docker) | 5432 |
+| Backend Postgres (`data-db`, Docker) | 5433 |

@@ -1,5 +1,9 @@
 title: HGS Refuce Application
 description: Documentation for the HGS Refuce Application — waste/refuse tracking for a local Bouvet office.
+
+url: "https://bouvet.github.io"
+baseurl: "/hgs-refuce-application"
+
 theme: null
 remote_theme: just-the-docs/just-the-docs
 
@@ -23,7 +27,19 @@ back_to_top_text: "Back to top"
 
 footer_content: "HGS Refuce Application documentation."
 
+callouts:
+  note:
+    title: Note
+    color: blue
+  warning:
+    title: Warning
+    color: yellow
+  important:
+    title: Important
+    color: red
+
 exclude:
   - Gemfile
   - Gemfile.lock
   - node_modules
+  - README.md
