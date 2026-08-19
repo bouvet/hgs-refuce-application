@@ -33,7 +33,7 @@ own implicit `pages-build-deployment` run handles it. See [CI/CD]({{ site.baseur
    five sections (`Getting Started`, `Architecture`, `Backend`, `Frontend`, `Deployment`) all do.
    Pick `nav_order` based on where it should sit among its siblings; just-the-docs sorts by this
    field within a parent.
-3. Use `{{ site.baseurl }}` (or a Jekyll `{% link %}` tag) for every internal link — bare relative
+3. Use `{{ site.baseurl }}` (or a Jekyll {% raw %}`{% link %}`{% endraw %} tag) for every internal link — bare relative
    paths like `../backend/` break once `baseurl` is set. See `docs/_config.yml`'s `baseurl:
    "/hgs-refuce-application"`.
 4. Cross-link related pages, and cite file paths (e.g. `backend_fast_api/src/hgs_refuce_app/main.py`)
