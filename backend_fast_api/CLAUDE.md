@@ -21,7 +21,7 @@ uvicorn hgs_refuce_app.main:app --reload --port 8000
 pytest
 
 # Run a single test
-pytest tests/test_endpoints.py::test_add_and_get_datapoint
+pytest tests/test_endpoints.py::test_create_and_get_registration
 ```
 
 ## Local dev env vars (gotcha)

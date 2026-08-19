@@ -1,33 +1,42 @@
-#.env
+# HGS Refuce Application
 
+A waste/refuse tracking system for a local Bouvet office. Users register waste by type and weight
+against a location; each quarter is closed off by submitting a report, which locks that quarter
+against further edits.
+
+**📖 Full documentation: https://bouvet.github.io/hgs-refuce-application/**
+
+## Sub-projects
+
+| Part | Stack | Directory |
+| --- | --- | --- |
+| Backend | Python 3.11, FastAPI, SQLAlchemy (SQLite dev / PostgreSQL prod) | `backend_fast_api/` |
+| Frontend | Next.js 16, TypeScript, Tailwind CSS v4, shadcn/UI, Better Auth | `frontend/` |
+
+## Quickstart
+
+One-time setup:
+
+```bash
+python -m venv backend_fast_api/.venv
+# Windows:
+backend_fast_api\.venv\Scripts\activate
+# bash/WSL:
+source backend_fast_api/.venv/bin/activate
+
+pip install -r backend_fast_api/requirements.txt
+cd frontend && npm install && cd ..
 ```
-# Copy this file to .env and adjust values for your environment.
-# This file is committed to git; .env is not.
 
-APP_ENV=development
-DATABASE_PATH=./data.db
+There is no combined start script — run each service in its own terminal:
 
-# Logging
-# LOG_LEVEL: DEBUG | INFO | WARNING | ERROR | CRITICAL
-LOG_LEVEL=INFO
-# Prod-only: where log files are written and how many records are buffered
-# in memory before being flushed on a crash (ERROR/CRITICAL).
-LOG_DIR=./logs
-LOG_BUFFER_CAPACITY=1000
+```bash
+cd backend_fast_api && uvicorn hgs_refuce_app.main:app --reload --port 8000
+cd frontend && npm run dev
 ```
 
-To test localy
-```
-    # First time
-     cp .env.example .env
-     # Edit .env — fill in SECRET_KEY and ADMIN_SECRET
+See [Running locally](https://bouvet.github.io/hgs-refuce-application/getting-started/running-locally/)
+for required environment variables and more detail.
 
-     # Build and start
-     docker compose up --build
-
-     # Subsequent runs (no code changes)
-     docker compose up
-
-     # Clean slate (wipe the database volume)
-     docker compose down -v
-```
+For the full walkthrough — installation, running locally, Docker Compose, environment variables,
+architecture, deployment — see **[the documentation site](https://bouvet.github.io/hgs-refuce-application/)**.
