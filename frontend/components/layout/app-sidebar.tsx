@@ -103,7 +103,8 @@ export function AppSidebar() {
         </div>
         <div>
           <div className="text-sm font-bold text-foreground leading-tight">
-            WasteFlow
+            <span>Waste</span>
+            <span className="text-primary">Flow</span>
           </div>
           <div className="text-xs text-muted-foreground leading-tight">
             {isSuperAdmin ? "Super-admin" : isAdmin ? "Admin" : "Registrerer"}
