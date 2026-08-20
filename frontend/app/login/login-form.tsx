@@ -126,6 +126,10 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
   return (
     <div className="flex flex-col items-center gap-8 w-full max-w-sm">
       <div className="flex flex-col items-center gap-2 text-center">
+        <div className="text-5xl font-bold mb-2">
+          <span>Waste</span>
+          <span className="text-primary">Flow</span>
+        </div>
         <div className="flex items-center justify-center size-14 rounded-2xl bg-primary text-primary-foreground mb-2">
           <Leaf className="size-7" />
         </div>
